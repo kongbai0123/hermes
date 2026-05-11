@@ -4,31 +4,28 @@ from hermes.core.types import ToolResult
 
 @dataclass(frozen=True)
 class ToolSpec:
-    """定義工具的規格與權限"""
     name: str
     description: str
     permission: Literal["read", "write", "shell", "network"]
     handler: Callable
 
 class ToolRegistry:
-    """Hermes 工具註冊中心"""
     def __init__(self, executor: Any = None):
         self.tools: Dict[str, ToolSpec] = {}
         if executor:
             self._register_default_tools(executor)
 
     def _register_default_tools(self, executor):
-        # 註冊唯讀工具
         self.add_tool(ToolSpec(
             name="read_file",
-            description="讀取指定檔案的內容。參數: {'file_path': '路徑'}",
+            description="讀取指定路徑的檔案內容。參數: {'path': '檔案路徑'}",
             permission="read",
             handler=executor.read_file
         ))
         
         self.add_tool(ToolSpec(
             name="list_files",
-            description="列出目錄下的檔案清單。參數: {'directory': '路徑'}",
+            description="列出指定目錄下的檔案與子目錄清單。參數: {'path': '目錄路徑'}",
             permission="read",
             handler=executor.list_files
         ))
@@ -40,7 +37,6 @@ class ToolRegistry:
         return self.tools.get(name)
 
     def get_all_descriptions(self) -> str:
-        """格式化所有工具描述，供模型 Prompt 使用"""
         lines = []
         for name, spec in self.tools.items():
             lines.append(f"- {name}: {spec.description}")
