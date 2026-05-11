@@ -25,7 +25,8 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-type', 'application/json; charset=utf-8')
             self.end_headers()
-            self.wfile.write(json.dumps(runtime.monitor.traces, ensure_ascii=False).encode('utf-8'))
+            traces = runtime.monitor.get_serializable_traces()
+            self.wfile.write(json.dumps(traces, ensure_ascii=False).encode('utf-8'))
         elif self.path == "/api/governance":
             self.send_response(200)
             self.send_header('Content-type', 'application/json; charset=utf-8')

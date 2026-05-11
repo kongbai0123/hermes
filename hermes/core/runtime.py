@@ -1,40 +1,33 @@
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 from hermes.core.state_machine import StateMachine, AgentState
-from hermes.utils.monitor import Monitor
-from hermes.core.llm_provider import LLMProvider, OllamaProvider
+from hermes.core.types import ToolPlan, ToolResult, RuntimeTrace, CapabilityPolicy
+from hermes.core.tool_planner import ToolPlanner
+from hermes.core.llm_provider import LLMProvider, OllamaProvider, MockLLMProvider
 from hermes.harness.constraints import ConstraintValidator
-from hermes.harness.governance import GovernanceManager
-from hermes.harness.verifier import Verifier
 from hermes.harness.executor import SafeExecutor
-from hermes.memory.manager import MemoryManager
-from hermes.skills.base import SkillRegistry
-from hermes.skills.compiler import SkillCompiler
+from hermes.harness.tools import ToolRegistry
+from hermes.utils.monitor import Monitor
 
 class HermesRuntime:
+    """
+    Hermes Agent Runtime: 負責代理的狀態管理與任務執行閉環。
+    """
     def __init__(self, agent_id: str = "hermes-v1", llm_provider: Optional[LLMProvider] = None):
         self.agent_id = agent_id
         self.monitor = Monitor()
         self.state_machine = StateMachine(on_state_change=self._handle_state_change)
         self.llm = llm_provider or OllamaProvider()
         
-        # Harness & Governance
-        self.harness = ConstraintValidator()
-        self.governance = GovernanceManager()
-        self.verifier = Verifier(self.llm)
-        self.executor = SafeExecutor(self.harness, self.governance)
+        # 安全與工具體系
+        self.constraints = ConstraintValidator()
+        self.executor = SafeExecutor(self.constraints)
+        self.registry = ToolRegistry(self.executor)
+        self.planner = ToolPlanner(self.registry)
+        self.policy = CapabilityPolicy() # v1 預設 Read-Only
         
-        # Memory & Skills
-        self.memory = MemoryManager()
-        self.skills = SkillRegistry()
-        self.compiler = SkillCompiler(self.skills)
         self.is_running = False
-        self.last_result: Dict[str, Any] = {
-            "status": "IDLE",
-            "task": None,
-            "response": "",
-            "error": None
-        }
+        self.last_result = {"status": "IDLE", "task": "", "response": "", "error": ""}
 
     def _handle_state_change(self, old_state: AgentState, new_state: AgentState):
         print(f"[*] State Transition: {old_state.name} -> {new_state.name}")
@@ -44,100 +37,84 @@ class HermesRuntime:
             data={"from": old_state.name}
         )
 
-    def configure_llm(self, llm_provider: LLMProvider):
-        self.llm = llm_provider
-        self.verifier = Verifier(self.llm)
-
-    def execute_task(self, task: str, user_system_prompt: Optional[str] = None) -> Dict[str, Any]:
+    def execute_task(self, task: str):
+        """執行任務閉環流程"""
         self.is_running = True
+        self.last_result = {"status": "RUNNING", "task": task, "response": "", "error": ""}
         start_time = time.time()
-        self.last_result = {
-            "status": "RUNNING",
-            "task": task,
-            "response": "",
-            "error": None
-        }
-        print(f"\n[Task] {task}")
         
-        try:
-            # 0. Context Retrieval (從記憶提取上下文)
-            context = self.memory.get_context(task)
-            
-            # 1. Planning (透過 LLM 生成計畫，注入上下文)
-            self.state_machine.transition_to(AgentState.PLANNING, reason="Decomposing task with memory context")
-            
-            system_rules = "\n".join(context["system_rules"])
-            user_pref = str(context["user_prefs"])
-            skills = "\n".join([f"- {s['name']}: {s['description']}" for s in context["available_skills"]])
-            
-            prompt = f"Context from Memory:\n{context['relevant_knowledge']}\n\nAvailable Skills:\n{skills}\n\nTask: {task}"
-            custom_rules = f"\nUser System Prompt: {user_system_prompt.strip()}" if user_system_prompt and user_system_prompt.strip() else ""
-            system_prompt = f"System Rules: {system_rules}\nUser Preference: {user_pref}{custom_rules}\nDefault Language: Traditional Chinese (zh-Hant) when the user writes in Chinese. Avoid Simplified Chinese unless explicitly requested.\n\nProvide a helpful response and a concise technical plan when useful. Use available skills if applicable."
-            
-            plan_response = self.llm.completion(prompt=prompt, system_prompt=system_prompt)
-            
-            self.monitor.record_tokens(
-                plan_response["usage"]["input"], 
-                plan_response["usage"]["output"]
-            )
-            print(f"[Plan] {plan_response['text'][:100]}...")
+        # 紀錄使用者指令
+        self.monitor.traces.append(RuntimeTrace(event_type="USER_CMD", message=f"User Task: {task}", payload={"task": task}))
 
-            # 2. Executing
-            self.state_machine.transition_to(AgentState.EXECUTING, reason="Executing validated steps")
-            # ... 執行邏輯 ...
-            time.sleep(0.3)
-            user_response = plan_response["text"]
+        try:
+            # 1. Routing & Planning
+            self.state_machine.transition_to(AgentState.PLANNING, reason="Determining tool necessity")
             
-            # 3. Verifying
-            self.state_machine.transition_to(AgentState.VERIFYING, reason="Validating results")
-            success = True 
+            tool_descriptions = self.registry.get_all_descriptions()
+            system_prompt = (
+                f"You are Hermes Agent OS. Current Mode: READ_ONLY.\n"
+                f"Available Tools:\n{tool_descriptions}\n\n"
+                "If you need to read a file or list a directory to answer, return a JSON object:\n"
+                '{"tool": "tool_name", "args": {"arg_name": "value"}, "reason": "why"}\n'
+                "Otherwise, answer directly."
+            )
             
-            if success:
-                self.state_machine.transition_to(AgentState.DONE, reason="Task completed")
-                self.last_result = {
-                    "status": AgentState.DONE.name,
-                    "task": task,
-                    "response": user_response,
-                    "error": None
-                }
-                self.monitor.add_trace(
-                    state=AgentState.DONE.name,
-                    action="USER_RESPONSE",
-                    data={"response": user_response}
-                )
-                # 4. Consolidate Memory (將經驗存入記憶)
-                self.memory.consolidate_session(task, user_response)
+            # 第一階段推理：判斷是否需要工具
+            self.monitor.traces.append(RuntimeTrace(event_type="PLAN_REQUEST", message="LLM planning request", payload={"task": task}))
+            plan_response = self.llm.completion(prompt=task, system_prompt=system_prompt)
+            raw_plan_text = plan_response["text"]
+            
+            # 解析工具計畫
+            plan = self.planner.parse_output(raw_plan_text)
+            
+            if plan:
+                # 2. Executing Tool
+                self.monitor.traces.append(RuntimeTrace(event_type="TOOL_PLAN", message=f"Tool Plan: {plan.tool}", payload={"tool": plan.tool, "args": plan.args, "reason": plan.reason}))
+                self.state_machine.transition_to(AgentState.EXECUTING, reason=f"Calling {plan.tool}")
+                
+                tool_spec = self.registry.get_tool(plan.tool)
+                if tool_spec:
+                    self.monitor.traces.append(RuntimeTrace(event_type="TOOL_CALL", message=f"Executing {plan.tool}", payload={"args": plan.args}))
+                    result: ToolResult = tool_spec.handler(**plan.args)
+                    
+                    # 紀錄工具結果
+                    result_payload = {"ok": result.ok, "summary": result.summary, "error": result.error, "metadata": result.metadata}
+                    self.monitor.traces.append(RuntimeTrace(event_type="TOOL_RESULT", message=result.summary, payload=result_payload))
+                    
+                    # 3. Synthesizing Answer (閉環)
+                    if result.ok:
+                        self.state_machine.transition_to(AgentState.VERIFYING, reason="Synthesizing final answer from tool content")
+                        context_prompt = f"User asked: {task}\n\nTool '{plan.tool}' returned:\n{result.content}\n\nBased on this information, provide the final answer."
+                        final_response = self.llm.completion(prompt=context_prompt, system_prompt="Synthesize the final answer based on the tool output.")
+                        self.last_result.update({"status": "DONE", "response": final_response["text"]})
+                        self.monitor.traces.append(RuntimeTrace(event_type="LLM_FINAL", message="Task completed successfully", payload={"response": final_response["text"]}))
+                    else:
+                        self.last_result.update({"status": "FAILED", "error": result.error})
+                        self.monitor.traces.append(RuntimeTrace(event_type="HERMES_ERROR", message=f"Tool execution failed: {result.error}"))
             else:
-                self.state_machine.transition_to(AgentState.RECOVERING, reason="Verification failed")
-                self.last_result = {
-                    "status": AgentState.RECOVERING.name,
-                    "task": task,
-                    "response": "",
-                    "error": "Verification failed"
-                }
+                # 直接回答路徑
+                self.last_result.update({"status": "DONE", "response": raw_plan_text})
+                self.monitor.traces.append(RuntimeTrace(event_type="LLM_FINAL", message="Direct answer generated", payload={"response": raw_plan_text}))
+
+            self.state_machine.transition_to(AgentState.DONE, reason="Task iteration finished")
 
         except Exception as e:
-            self.monitor.record_error("RUNTIME_ERROR", str(e))
-            self.state_machine.transition_to(AgentState.FAILED, reason=f"Exception: {str(e)}")
-            self.last_result = {
-                "status": AgentState.FAILED.name,
-                "task": task,
-                "response": "",
-                "error": str(e)
-            }
+            err_msg = f"Runtime Crash: {str(e)}"
+            self.monitor.record_error("RUNTIME_ERROR", err_msg)
+            self.state_machine.transition_to(AgentState.FAILED, reason=err_msg)
+            self.last_result.update({"status": "FAILED", "error": err_msg})
+            self.monitor.traces.append(RuntimeTrace(event_type="HERMES_ERROR", message=err_msg))
         
         finally:
             self.is_running = False
             duration = time.time() - start_time
             self.monitor.record_latency("total_execution", duration)
-            print(f"[+] Task finished in {duration:.2f}s")
-            return self.last_result
 
     def get_status(self) -> Dict[str, Any]:
         return {
             "agent_id": self.agent_id,
             "current_state": self.state_machine.current_state.name,
             "is_running": self.is_running,
-            "metrics": self.monitor.get_summary(),
-            "last_result": self.last_result
+            "last_result": self.last_result,
+            "metrics": self.monitor.get_summary()
         }

@@ -1,57 +1,83 @@
-import subprocess
 import os
-from typing import Tuple, Dict, Any
+from pathlib import Path
+from typing import List, Dict, Any, Optional
 from hermes.harness.constraints import ConstraintValidator
-from hermes.harness.governance import GovernanceManager
+from hermes.core.types import ToolResult
 
 class SafeExecutor:
     """
-    安全執行引擎: 負責受限環境下的指令執行。
+    安全執行器: 負責在 Harness 約束下執行工具。
+    V1 版本僅開放唯讀操作。
     """
-    def __init__(self, constraints: ConstraintValidator, governance: GovernanceManager):
+    def __init__(self, constraints: ConstraintValidator):
         self.constraints = constraints
-        self.governance = governance
+        self.max_read_chars = 12000
+        self.max_file_size = 512 * 1024  # 512 KB
 
-    def execute_shell(self, command: str) -> Tuple[bool, str]:
-        # 1. 檢查治理層權限
-        if not self.governance.is_authorized("shell_execute"):
-            return False, "Permission denied: shell_execute is not granted."
+    def list_files(self, directory: str = ".") -> ToolResult:
+        """列出指定目錄下的檔案與子目錄"""
+        is_safe, target_path_str = self.constraints.validate_file_access(directory)
+        if not is_safe:
+            return ToolResult(ok=False, tool="list_files", summary="Access Denied", error=target_path_str)
         
-        # 2. 檢查安全限制 (Harness)
-        is_safe, msg = self.constraints.validate_command(command)
-        if not is_safe:
-            return False, msg
-
-        # 3. 執行指令 (模擬受限環境)
         try:
-            # 實際執行時應加入 timeout 與 cwd 限制
-            result = subprocess.run(
-                command, 
-                shell=True, 
-                capture_output=True, 
-                text=True, 
-                timeout=30,
-                cwd="e:/program/hermes" # 強制在工作目錄執行
+            target_path = Path(target_path_str)
+            if not target_path.is_dir():
+                return ToolResult(ok=False, tool="list_files", summary="Not a directory", error=f"{directory} is not a directory")
+            
+            items = []
+            for item in target_path.iterdir():
+                prefix = "[D] " if item.is_dir() else "[F] "
+                items.append(f"{prefix}{item.name}")
+            
+            content = "\n".join(sorted(items))
+            return ToolResult(
+                ok=True, 
+                tool="list_files", 
+                summary=f"Found {len(items)} items in {directory}",
+                content=content
             )
-            
-            if result.returncode == 0:
-                return True, result.stdout
-            else:
-                return False, result.stderr
         except Exception as e:
-            return False, str(e)
+            return ToolResult(ok=False, tool="list_files", summary="Execution Error", error=str(e))
 
-    def write_file(self, path: str, content: str) -> Tuple[bool, str]:
-        if not self.governance.is_authorized("filesystem_write"):
-            return False, "Permission denied: filesystem_write is not granted."
-            
-        is_safe, msg = self.constraints.validate_file_access(path)
+    def read_file(self, file_path: str) -> ToolResult:
+        """讀取指定檔案內容，支援自動截斷"""
+        is_safe, target_path_str = self.constraints.validate_file_access(file_path)
         if not is_safe:
-            return False, msg
-            
+            return ToolResult(ok=False, tool="read_file", summary="Access Denied", error=target_path_str)
+        
         try:
-            with open(path, 'w', encoding='utf-8') as f:
-                f.write(content)
-            return True, f"Successfully wrote to {path}"
+            target_path = Path(target_path_str)
+            if not target_path.is_file():
+                return ToolResult(ok=False, tool="read_file", summary="Not a file", error=f"{file_path} is not a file")
+            
+            # 檔案大小檢查
+            file_size = target_path.stat().st_size
+            if file_size > self.max_file_size:
+                return ToolResult(ok=False, tool="read_file", summary="File too large", error=f"File exceeds {self.max_file_size/1024}KB limit")
+            
+            with open(target_path, 'r', encoding='utf-8', errors='replace') as f:
+                content = f.read(self.max_read_chars + 1)
+            
+            truncated = len(content) > self.max_read_chars
+            final_content = content[:self.max_read_chars]
+            
+            return ToolResult(
+                ok=True,
+                tool="read_file",
+                summary=f"Read success ({len(final_content)} chars)",
+                content=final_content,
+                metadata={
+                    "truncated": truncated,
+                    "original_size": file_size,
+                    "path": str(target_path)
+                }
+            )
         except Exception as e:
-            return False, str(e)
+            return ToolResult(ok=False, tool="read_file", summary="Execution Error", error=str(e))
+
+    def execute_shell(self, command: str) -> ToolResult:
+        return ToolResult(ok=False, tool="shell", summary="Disabled", error="Shell execution is disabled in v1.")
+
+    def write_file(self, path: str, content: str) -> ToolResult:
+        return ToolResult(ok=False, tool="write_file", summary="Disabled", error="File writing is disabled in v1.")

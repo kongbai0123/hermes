@@ -1,44 +1,57 @@
-import re
-from typing import List, Tuple
+import os
+from pathlib import Path
+from typing import Tuple, List, Optional
 
 class ConstraintValidator:
-    def __init__(self):
-        # 禁止執行的危險指令模式
-        self.blacklist_patterns = [
-            r"rm\s+-rf\s+/",         # 刪除根目錄
-            r"mkfs",                 # 格式化磁碟
-            r"dd\s+if=.*of=/dev/.*", # 破壞性寫入設備
-            r"shutdown",             # 關機
-            r"reboot",               # 重啟
-            r":\(\)\{ :\|:& \};:"    # 叉子炸彈 (Fork bomb)
-        ]
+    """
+    Harness 安全約束器: 確保 Agent 行為不超出預設邊界。
+    """
+    def __init__(self, workspace_root: Optional[str] = None):
+        # 預設工作區根目錄 (優先使用環境變數)
+        env_root = os.getenv("HERMES_WORKSPACE")
+        self.workspace_root = Path(env_root or workspace_root or "e:/program/hermes").resolve()
         
-        # 允許的操作範圍 (例如僅限特定目錄)
-        self.allowed_paths = ["e:/program/hermes"]
-
-    def validate_command(self, command: str) -> Tuple[bool, str]:
-        for pattern in self.blacklist_patterns:
-            if re.search(pattern, command, re.IGNORECASE):
-                return False, f"Blocked dangerous command: {command}"
-        return True, "Safe"
+        # 允許讀取的檔案副檔名 (白名單)
+        self.allowed_extensions = {
+            '.py', '.md', '.txt', '.json', '.yaml', '.yml', 
+            '.html', '.css', '.js', '.ts', '.toml', '.ini'
+        }
+        
+        # 絕對禁止訪問的敏感路徑或檔案
+        self.forbidden_names = {'.env', '.git', 'node_modules', 'secrets', '__pycache__'}
 
     def validate_file_access(self, path: str) -> Tuple[bool, str]:
-        # 簡單的路徑檢查
-        abs_path = path.lower().replace("\\", "/")
-        for allowed in self.allowed_paths:
-            if abs_path.startswith(allowed.lower()):
-                return True, "Access granted"
-        return False, f"Access denied: {path} is outside allowed workspace."
+        """
+        驗證路徑安全性：
+        1. 必須在庫中 (Workspace Boundary)
+        2. 禁止敏感名稱 (.env)
+        3. 必須是允許的副檔名 (Binary Blocking)
+        """
+        try:
+            target_path = Path(path)
+            # 如果是相對路徑，則相對於工作區
+            if not target_path.is_absolute():
+                target_path = (self.workspace_root / target_path).resolve()
+            else:
+                target_path = target_path.resolve()
 
-class PermissionGate:
-    def __init__(self, mode: str = "HITL"):
-        # HITL: Human-in-the-loop
-        # AUTO: Auto-approve safe operations
-        self.mode = mode
+            # 1. 邊界檢查 (Symlink Escape Prevention)
+            if not str(target_path).startswith(str(self.workspace_root)):
+                return False, f"Access Denied: Path is outside workspace boundary."
 
-    def request_permission(self, action: str) -> bool:
-        if self.mode == "AUTO":
-            return True
-        print(f"\n[!] PERMISSION REQUEST: {action}")
-        # 在實際 UI 中，這裡會彈出對話框
-        return True # 目前預設核准
+            # 2. 敏感檔案檢查
+            if any(name in target_path.parts for name in self.forbidden_names) or target_path.name in self.forbidden_names:
+                return False, f"Access Denied: Requested path contains forbidden system/sensitive items."
+
+            # 3. 檔案類型檢查 (僅針對檔案讀取)
+            if target_path.is_file():
+                if target_path.suffix.lower() not in self.allowed_extensions:
+                    return False, f"Access Denied: File type {target_path.suffix} is blocked (Binary/Unsupported)."
+
+            return True, str(target_path)
+        except Exception as e:
+            return False, f"Validation Error: {str(e)}"
+
+    def validate_command(self, command: str) -> Tuple[bool, str]:
+        """v1 階段暫不開放 Shell 執行"""
+        return False, "Shell execution is currently disabled in Read-Only mode."

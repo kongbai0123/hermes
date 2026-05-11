@@ -136,7 +136,6 @@
         @keyframes cyber-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes pulse-glow { 0%, 100% { opacity: 0.8; } 50% { opacity: 1; } }
 
-        /* 不要用 Unicode，改用 CSS Dot */
         .neon-dot {
             width: 8px;
             height: 8px;
@@ -146,6 +145,46 @@
             box-shadow: 0 0 6px var(--secondary), 0 0 12px var(--secondary);
             cursor: pointer;
         }
+
+        /* Permission Badge */
+        .permission-badge {
+            font-size: 0.6em;
+            background: rgba(255, 0, 255, 0.1);
+            border: 1px solid var(--secondary);
+            color: var(--secondary);
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-left: auto;
+            letter-spacing: 1px;
+            font-weight: 900;
+        }
+
+        .trace-event {
+            margin-bottom: 12px;
+            font-size: 0.85em;
+            border-left: 2px solid #333;
+            padding-left: 10px;
+            transition: 0.3s;
+            background: rgba(255, 255, 255, 0.02);
+            padding: 8px;
+        }
+        .trace-event:hover { border-left-color: var(--primary); background: rgba(0, 242, 255, 0.05); }
+        .trace-event-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-weight: bold; }
+        .trace-event-action {
+            text-transform: uppercase;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        .trace-event.error { border-left-color: #ff4444; }
+        .trace-event.error .trace-event-action { color: #ff4444; background: rgba(255, 68, 68, 0.1); }
+        .trace-event.tool-call { border-left-color: var(--secondary); }
+        .trace-event.tool-call .trace-event-action { color: var(--secondary); background: rgba(255, 0, 255, 0.1); }
+        .trace-event.tool-result { border-left-color: #0f0; }
+        .trace-event.tool-result .trace-event-action { color: #0f0; background: rgba(0, 255, 0, 0.1); }
+        .trace-event.state { border-left-color: var(--accent); }
+        .trace-event.state .trace-event-action { color: var(--accent); background: rgba(88, 166, 255, 0.1); }
+        .trace-event-body { color: #888; font-family: 'Share Tech Mono', monospace; font-size: 0.8em; margin: 0; overflow-x: auto; }
 
         /* Controls */
         .setting-group { display: flex; flex-direction: column; gap: 8px; }
@@ -535,6 +574,7 @@
                     <div style="font-size:0.6em; color:#555;">SECURITY CLEARED</div>
                 </div>
             </div>
+            <span class="permission-badge">READ_ONLY</span>
             <div style="color:var(--primary); font-size:1.2em;">🔒</div>
 
             <div class="user-popup" id="user-popup" onclick="event.stopPropagation()">
