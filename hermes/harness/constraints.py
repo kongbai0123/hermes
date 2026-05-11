@@ -39,8 +39,10 @@ class ConstraintValidator:
             else:
                 target_path = target_path.resolve()
 
-            # 1. 邊界檢查
-            if not str(target_path).startswith(str(self.workspace_root)):
+            # 1. 邊界檢查 (使用 relative_to 確保目標路徑確實位於 workspace_root 之下)
+            try:
+                target_path.relative_to(self.workspace_root)
+            except ValueError:
                 return False, f"Access Denied: Path [{path}] is outside workspace boundary."
 
             # 2. 敏感檔案檢查

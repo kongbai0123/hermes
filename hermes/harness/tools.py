@@ -6,7 +6,7 @@ from hermes.core.types import ToolResult
 class ToolSpec:
     name: str
     description: str
-    permission: Literal["read", "write", "shell", "network", "test"]
+    permission: Literal["read", "write_proposal", "write", "shell", "test"]
     handler: Callable
 
 class ToolRegistry:
@@ -30,9 +30,21 @@ class ToolRegistry:
         ))
         self.add_tool(ToolSpec(
             name="grep_search",
-            description="全域關鍵字搜尋。參數: {'query': '關鍵字', 'path': '搜尋起點'}",
+            description="全域關鍵字搜尋。參數: {'query': '關鍵字', 'path': '路徑'}",
             permission="read",
             handler=executor.grep_search
+        ))
+        self.add_tool(ToolSpec(
+            name="propose_patch",
+            description="提出變更建議 (不寫入硬碟)。參數: {'task': '任務描述', 'changes': [{'path': '路徑', 'operation': 'modify/create/delete', 'replacement': '新內容'}]}",
+            permission="write_proposal",
+            handler=executor.propose_patch
+        ))
+        self.add_tool(ToolSpec(
+            name="apply_approved_patch",
+            description="套用已授權的變更 (實體寫入)。參數: {'patch_id': 'ID', 'approval_token': 'Token'}",
+            permission="write",
+            handler=executor.apply_approved_patch
         ))
         self.add_tool(ToolSpec(
             name="run_tests",
