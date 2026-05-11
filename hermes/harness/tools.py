@@ -18,13 +18,13 @@ class ToolRegistry:
     def _register_default_tools(self, executor):
         self.add_tool(ToolSpec(
             name="read_file",
-            description="讀取指定檔案。參數: {'path': '檔案路徑'}",
+            description="讀取指定路徑的檔案內容。參數: {'path': '檔案路徑'}",
             permission="read",
             handler=executor.read_file
         ))
         self.add_tool(ToolSpec(
             name="list_files",
-            description="列出目錄清單。參數: {'path': '目錄路徑'}",
+            description="列出指定目錄下的檔案清單。參數: {'path': '目錄路徑'}",
             permission="read",
             handler=executor.list_files
         ))

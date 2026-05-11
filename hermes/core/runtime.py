@@ -10,15 +10,21 @@ from hermes.harness.tools import ToolRegistry
 from hermes.utils.monitor import Monitor
 
 class HermesRuntime:
+    """
+    Hermes Agent Runtime: 負責代理的狀態管理與任務執行閉環。
+    """
     def __init__(self, agent_id: str = "hermes-v1", llm_provider: Optional[LLMProvider] = None):
         self.agent_id = agent_id
         self.monitor = Monitor()
         self.state_machine = StateMachine(on_state_change=self._handle_state_change)
         self.llm = llm_provider or OllamaProvider()
+        
+        # 核心地基整合
         self.constraints = ConstraintValidator()
         self.executor = SafeExecutor(self.constraints)
         self.tools = ToolRegistry(self.executor)
         self.planner = ToolPlanner(self.tools)
+        
         self.is_running = False
         self.last_result = {"status": "IDLE", "task": "", "response": "", "error": "", "trace": []}
 
@@ -28,37 +34,66 @@ class HermesRuntime:
     def execute_task(self, task: str, **llm_config):
         self.is_running = True
         self.last_result = {"status": "RUNNING", "task": task, "response": "", "error": "", "trace": []}
-        self.monitor.traces.append(RuntimeTrace("USER_CMD", f"Task: {task}", {"task": task}))
+        start_time = time.time()
         
-        try:
-            self.state_machine.transition_to(AgentState.PLANNING)
-            sys_prompt = f"Mode: READ_ONLY. Tools:\n{self.tools.get_all_descriptions()}\nReturn JSON or direct answer."
-            resp = self.llm.completion(prompt=task, system_prompt=sys_prompt, **llm_config)
-            plan = self.planner.parse_output(resp["text"])
+        self.monitor.traces.append(RuntimeTrace(event_type="USER_CMD", message=f"Task: {task}", payload={"task": task}))
 
+        try:
+            # 1. Planning 階段
+            self.state_machine.transition_to(AgentState.PLANNING)
+            
+            tool_descriptions = self.tools.get_all_descriptions()
+            system_prompt = (
+                f"You are Hermes Agent OS. Mode: READ_ONLY.\n"
+                f"Tools:\n{tool_descriptions}\n\n"
+                "If tool needed, return JSON:\n"
+                '{"tool": "name", "args": {"path": "value"}, "reason": "why"}\n'
+                "Otherwise, answer directly."
+            )
+            
+            plan_response = self.llm.completion(prompt=task, system_prompt=system_prompt, **llm_config)
+            plan = self.planner.parse_output(plan_response["text"])
+            
             if plan:
-                self.monitor.traces.append(RuntimeTrace("TOOL_PLAN", f"Plan: {plan.tool}", plan.args))
+                # 2. Executing 階段
+                self.monitor.traces.append(RuntimeTrace(event_type="TOOL_PLAN", message=f"Plan: {plan.tool}", payload=plan.args))
                 self.state_machine.transition_to(AgentState.EXECUTING)
-                spec = self.tools.get_tool(plan.tool)
-                if spec:
-                    self.monitor.traces.append(RuntimeTrace("TOOL_CALL", f"Call: {plan.tool}", plan.args))
-                    res = spec.handler(**plan.args)
-                    self.monitor.traces.append(RuntimeTrace("TOOL_RESULT", res.summary, {"ok": res.ok, "data": res.metadata}))
-                    if res.ok:
+                
+                tool_spec = self.tools.get_tool(plan.tool)
+                if tool_spec:
+                    self.monitor.traces.append(RuntimeTrace(event_type="TOOL_CALL", message=f"Call: {plan.tool}", payload=plan.args))
+                    result: ToolResult = tool_spec.handler(**plan.args)
+                    
+                    # 紀錄工具結果
+                    self.monitor.traces.append(RuntimeTrace(event_type="TOOL_RESULT", message=result.summary, payload={"ok": result.ok}))
+                    
+                    if result.ok:
+                        # 3. Verifying / Finalizing 階段 (閉環)
                         self.state_machine.transition_to(AgentState.VERIFYING)
-                        final_prompt = f"Task: {task}\nResult: {res.content}\nSummarize:"
-                        final_resp = self.llm.completion(prompt=final_prompt, system_prompt="Answer based on result.")
-                        self.last_result.update({"status": "DONE", "response": final_resp["text"]})
-                    else: self.last_result.update({"status": "FAILED", "error": res.error})
+                        context_prompt = f"User asked: {task}\n\nTool Result:\n{result.content}\n\nFinalize answer:"
+                        final_response = self.llm.completion(prompt=context_prompt, system_prompt="Answer based on tool content.")
+                        self.last_result.update({"status": "DONE", "response": final_response["text"]})
+                    else:
+                        self.last_result.update({"status": "FAILED", "error": result.error})
             else:
-                self.last_result.update({"status": "DONE", "response": resp["text"]})
+                self.last_result.update({"status": "DONE", "response": plan_response["text"]})
+
             self.state_machine.transition_to(AgentState.DONE)
+
         except Exception as e:
             self.state_machine.transition_to(AgentState.FAILED)
             self.last_result.update({"status": "FAILED", "error": str(e)})
+        
         finally:
             self.is_running = False
             self.last_result["trace"] = self.monitor.get_serializable_traces()
+            self.monitor.record_latency("execution", time.time() - start_time)
 
     def get_status(self) -> Dict[str, Any]:
-        return {"agent_id": self.agent_id, "current_state": self.state_machine.current_state.name, "is_running": self.is_running, "last_result": self.last_result, "metrics": self.monitor.get_summary()}
+        return {
+            "agent_id": self.agent_id,
+            "current_state": self.state_machine.current_state.name,
+            "is_running": self.is_running,
+            "last_result": self.last_result,
+            "metrics": self.monitor.get_summary()
+        }
