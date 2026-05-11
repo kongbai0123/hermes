@@ -1,0 +1,57 @@
+{
+    "summary": {
+        "metrics": {
+            "token_usage": {
+                "input": 10,
+                "output": 20,
+                "total": 30
+            },
+            "latency": [
+                {
+                    "component": "total_execution",
+                    "duration": 0.303,
+                    "timestamp": 1778436394.9042761
+                }
+            ],
+            "errors": [],
+            "tool_calls": 0,
+            "success_rate": 0.0
+        },
+        "total_duration": 0.303,
+        "timestamp": "2026-05-11T02:06:34.904276"
+    },
+    "traces": [
+        {
+            "timestamp": "2026-05-11T02:06:34.601704",
+            "state": "PLANNING",
+            "action": "TRANSITION",
+            "data": {
+                "from": "IDLE"
+            }
+        },
+        {
+            "timestamp": "2026-05-11T02:06:34.601704",
+            "state": "EXECUTING",
+            "action": "TRANSITION",
+            "data": {
+                "from": "PLANNING"
+            }
+        },
+        {
+            "timestamp": "2026-05-11T02:06:34.903275",
+            "state": "VERIFYING",
+            "action": "TRANSITION",
+            "data": {
+                "from": "EXECUTING"
+            }
+        },
+        {
+            "timestamp": "2026-05-11T02:06:34.903275",
+            "state": "DONE",
+            "action": "TRANSITION",
+            "data": {
+                "from": "VERIFYING"
+            }
+        }
+    ]
+}

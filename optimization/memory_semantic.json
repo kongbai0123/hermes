@@ -1,0 +1,107 @@
+[
+    {
+        "content": "Task: Optimize local file structure\nResult: Successfully executed and verified.",
+        "metadata": {
+            "type": "session_summary"
+        },
+        "id": 0
+    },
+    {
+        "content": "Task: Optimize local file structure\nResult: Successfully executed and verified.",
+        "metadata": {
+            "type": "session_summary"
+        },
+        "id": 1
+    },
+    {
+        "content": "Task: 請幫我做一個簡單的網站，並且可以架設\nResult: Successfully executed and verified.",
+        "metadata": {
+            "type": "session_summary"
+        },
+        "id": 2
+    },
+    {
+        "content": "Task: 請幫我做一個簡單的網站，並可以架設\n內容簡約\nResult: Successfully executed and verified.",
+        "metadata": {
+            "type": "session_summary"
+        },
+        "id": 3
+    },
+    {
+        "content": "Task: 幫我做一個簡約風的網站\nResult: Successfully executed and verified.",
+        "metadata": {
+            "type": "session_summary"
+        },
+        "id": 4
+    },
+    {
+        "content": "Task: 你好\nResult: Successfully executed and verified.",
+        "metadata": {
+            "type": "session_summary"
+        },
+        "id": 5
+    },
+    {
+        "content": "Task: 你好\n\nResult: Successfully executed and verified.",
+        "metadata": {
+            "type": "session_summary"
+        },
+        "id": 6
+    },
+    {
+        "content": "Task: 你好\nResult: Successfully executed and verified.",
+        "metadata": {
+            "type": "session_summary"
+        },
+        "id": 7
+    },
+    {
+        "content": "Task: 你好\nResult: Successfully executed and verified.",
+        "metadata": {
+            "type": "session_summary"
+        },
+        "id": 8
+    },
+    {
+        "content": "Task: 你好，請回覆一句話\nResult: [MOCK] This is a simulated response for: Context from Memory:\n[]\n\nAvailable Skills:\n\n\nTask: 你好，請回覆一句話",
+        "metadata": {
+            "type": "session_summary"
+        },
+        "id": 9
+    },
+    {
+        "content": "Task: 測試 token\nResult: [MOCK] This is a simulated response for: Context from Memory:\n[]\n\nAvailable Skills:\n\n\nTask: 測試 token",
+        "metadata": {
+            "type": "session_summary"
+        },
+        "id": 10
+    },
+    {
+        "content": "Task: 你好，請用繁體中文回答一句話。\nResult: 你好，我是Hermes，很高兴为你服务。",
+        "metadata": {
+            "type": "session_summary"
+        },
+        "id": 11
+    },
+    {
+        "content": "Task: 你好，請用繁體中文回答一句話。\nResult: 你好，我是Hermes，很高興為你服務。",
+        "metadata": {
+            "type": "session_summary"
+        },
+        "id": 12
+    },
+    {
+        "content": "Task: 你好\nResult: 你好！有什麼可以幫助你的嗎？",
+        "metadata": {
+            "type": "session_summary"
+        },
+        "id": 13
+    },
+    {
+        "content": "Task: 你可以為我做甚麼\nResult: 我作為 Hermes Agent OS，可以協助您處理多種任務，例如：  \n- 解決問題與提供資訊查詢  \n- 管理與優化工作流程  \n- 自動化重複性操作  \n- 分析數據與生成報告  \n- 協助語言翻譯與溝通  \n\n請告訴我您需要協助的具體內容，我會盡力為您提供支援！ 😊",
+        "metadata": {
+            "type": "session_summary"
+        },
+        "id": 14
+    }
+]
