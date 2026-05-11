@@ -36,7 +36,7 @@ class TestSafeExecutor(unittest.TestCase):
     def test_sensitive_file_blocked(self):
         result = self.executor.read_file(path=".env")
         self.assertFalse(result.ok)
-        self.assertIn("Forbidden", result.error)
+        self.assertIn("Access Denied", result.error)
 
 if __name__ == '__main__':
     unittest.main()

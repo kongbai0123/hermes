@@ -5,14 +5,14 @@ from hermes.core.types import ToolResult
 
 class SafeExecutor:
     """
-    安全執行器: 負責在 Harness 約束下執行唯讀工具。
+    安全執行器: 在 Harness 約束下執行唯讀任務。
     """
     def __init__(self, constraints: ConstraintValidator):
         self.constraints = constraints
         self.max_read_chars = 12000
 
     def read_file(self, path: str, max_chars: Optional[int] = None) -> ToolResult:
-        """讀取檔案，支援截斷"""
+        """讀取檔案內容，具備自動截斷"""
         limit = max_chars or self.max_read_chars
         is_safe, target_path_str = self.constraints.validate_path(path)
         
@@ -22,7 +22,7 @@ class SafeExecutor:
         try:
             target_path = Path(target_path_str)
             if not target_path.is_file():
-                return ToolResult(ok=False, tool="read_file", summary="Not a file", error=f"Target [{path}] is not a file.")
+                return ToolResult(ok=False, tool="read_file", summary="Not a file", error=f"Target is not a file.")
             
             with open(target_path, 'r', encoding='utf-8', errors='replace') as f:
                 content = f.read(limit + 1)
@@ -50,7 +50,7 @@ class SafeExecutor:
         try:
             target_path = Path(target_path_str)
             if not target_path.is_dir():
-                return ToolResult(ok=False, tool="list_files", summary="Not a directory", error=f"Target [{path}] is not a directory.")
+                return ToolResult(ok=False, tool="list_files", summary="Not a directory", error=f"Target is not a directory.")
             
             items = []
             for item in list(target_path.iterdir())[:max_entries]:
