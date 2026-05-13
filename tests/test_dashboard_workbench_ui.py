@@ -74,6 +74,23 @@ class TestDashboardWorkbenchUI(unittest.TestCase):
         self.assertIn("API returned HTML", self.api_js)
         self.assertIn("restart Hermes", self.api_js)
         self.assertIn("content-type", self.api_js.lower())
+        self.assertIn("API_ENDPOINTS", self.api_js)
+        self.assertIn("requestFirstJson", self.api_js)
+
+    def test_send_task_handles_success_and_loading_state(self):
+        self.assertIn("appendAgentProgress", self.dashboard)
+        self.assertIn("updateAgentProgress", self.dashboard)
+        self.assertIn("Hermes is reading", self.dashboard)
+        self.assertIn("payload.result", self.dashboard)
+        self.assertNotIn("System Error: ${res.detail}", self.dashboard)
+
+    def test_user_settings_include_ai_preferences_and_enter_mode(self):
+        self.assertIn("AI Preferences", self.dashboard)
+        self.assertIn("User Rules", self.dashboard)
+        self.assertIn("send-mode", self.dashboard)
+        self.assertIn("Enter to send", self.dashboard)
+        self.assertIn("Ctrl+Enter to send", self.dashboard)
+        self.assertIn("handleComposerKeydown", self.dashboard)
 
 
 if __name__ == "__main__":

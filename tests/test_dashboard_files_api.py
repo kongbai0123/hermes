@@ -48,11 +48,14 @@ class TestDashboardFilesApi(unittest.TestCase):
 
         self.assertIn("/api/files/list", source)
         self.assertIn("/api/files/read", source)
+        self.assertIn("/files/list", source)
+        self.assertIn("/files/read", source)
 
     def test_fastapi_server_declares_file_read_route(self):
         source = Path("hermes/api/server.py").read_text(encoding="utf-8")
 
         self.assertIn('@app.get("/api/files/read")', source)
+        self.assertIn('@app.get("/files/read")', source)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,11 @@
 (() => {
+    const API_ENDPOINTS = {
+        filesList: ["/api/files/list", "/files/list"],
+        filesRead: ["/api/files/read", "/files/read"],
+        logs: ["/api/logs", "/logs"],
+        task: ["/api/task", "/task"]
+    };
+
     function describeApiError(resp, data) {
         const error = data && data.error ? data.error : {};
         const status = error.status || (resp && resp.status) || "ERR";
@@ -22,17 +29,38 @@
         return data;
     }
 
+    async function requestFirstJson(urls, makeUrl = url => url, options = {}) {
+        const errors = [];
+        for (const url of urls) {
+            try {
+                return await fetchJson(makeUrl(url), options);
+            } catch (error) {
+                errors.push(error.message || String(error));
+            }
+        }
+        throw new Error(errors.join(" | "));
+    }
+
     window.HermesApi = {
+        API_ENDPOINTS,
         describeApiError,
         fetchJson,
+        requestFirstJson,
         listFiles(path = ".") {
-            return fetchJson(`/api/files/list?path=${encodeURIComponent(path)}`);
+            return requestFirstJson(API_ENDPOINTS.filesList, url => `${url}?path=${encodeURIComponent(path)}`);
         },
         readFile(path) {
-            return fetchJson(`/api/files/read?path=${encodeURIComponent(path)}`);
+            return requestFirstJson(API_ENDPOINTS.filesRead, url => `${url}?path=${encodeURIComponent(path)}`);
         },
         fetchLogs() {
-            return fetchJson("/api/logs");
+            return requestFirstJson(API_ENDPOINTS.logs);
+        },
+        sendTask(payload) {
+            return requestFirstJson(API_ENDPOINTS.task, url => url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
         }
     };
 })();

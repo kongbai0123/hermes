@@ -146,11 +146,13 @@ async def execute_shell_action(proposal_id: str = Body(...), token: str = Body(.
 async def get_sessions():
     return runtime.memory.semantic.data
 
+@app.get("/files/list")
 @app.get("/api/files/list")
 async def list_files(path: str = "."):
     result = list_workspace_files(runtime.constraints.workspace_root, path)
     return JSONResponse(result, status_code=status_from_result(result))
 
+@app.get("/files/read")
 @app.get("/api/files/read")
 async def read_file(path: str):
     result = read_workspace_file(runtime.constraints.workspace_root, path)

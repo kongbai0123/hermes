@@ -248,6 +248,13 @@
             border-radius: var(--radius-sm);
             padding: 9px 10px;
             outline: none;
+            margin: 6px 0 10px;
+            font-family: var(--font-ui);
+        }
+        textarea.toolbox-input {
+            min-height: 92px;
+            resize: vertical;
+            line-height: 1.5;
         }
         .toolbox-actions {
             display: flex;
@@ -310,6 +317,43 @@
             flex-direction: column;
             gap: 32px;
             min-height: 0;
+        }
+        .agent-progress {
+            border-left: 2px solid var(--accent);
+            background: rgba(214, 184, 79, 0.04);
+            border-radius: var(--radius-sm);
+            padding: 10px 12px;
+            color: var(--text-secondary);
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .agent-progress .spinner {
+            width: 13px;
+            height: 13px;
+            border-radius: 50%;
+            border: 2px solid rgba(214, 184, 79, 0.25);
+            border-top-color: var(--accent);
+            animation: hermes-spin 0.8s linear infinite;
+            flex: 0 0 auto;
+        }
+        .agent-progress.done .spinner {
+            animation: none;
+            border-color: var(--success);
+            background: var(--success);
+        }
+        .agent-progress.error {
+            border-left-color: var(--danger);
+            background: rgba(255, 77, 77, 0.08);
+            color: var(--danger);
+        }
+        .agent-progress.error .spinner {
+            animation: none;
+            border-color: var(--danger);
+        }
+        @keyframes hermes-spin {
+            to { transform: rotate(360deg); }
         }
 
         /* Composer */
@@ -813,7 +857,7 @@
 
         <div class="composer-area">
             <div class="composer-container">
-                <textarea id="task-input" placeholder="Message Hermes Agent..." oninput="autoResize(this)"></textarea>
+                <textarea id="task-input" placeholder="Message Hermes Agent..." oninput="autoResize(this)" onkeydown="handleComposerKeydown(event)"></textarea>
                 <div class="composer-controls">
                     <div class="controls-left">
                         <div class="composer-iconbar" aria-label="Composer tools">
@@ -978,7 +1022,10 @@
             model: "qwen3:14b",
             agentStatus: "IDLE",
             logs: [],
-            lastLogIndex: -1
+            lastLogIndex: -1,
+            sendMode: localStorage.getItem('hermes_send_mode') || 'ctrl-enter',
+            aiPreferences: localStorage.getItem('hermes_ai_preferences') || '',
+            userRules: localStorage.getItem('hermes_user_rules') || ''
         };
         const SESSION_CONTENT = {
             upgrade: {
@@ -1065,6 +1112,17 @@
         function autoResize(textarea) {
             textarea.style.height = 'auto';
             textarea.style.height = textarea.scrollHeight + 'px';
+        }
+
+        function handleComposerKeydown(event) {
+            const isEnter = event.key === 'Enter';
+            if (!isEnter || event.isComposing) return;
+            const wantsSend = state.sendMode === 'enter'
+                ? !event.shiftKey && !event.ctrlKey
+                : event.ctrlKey;
+            if (!wantsSend) return;
+            event.preventDefault();
+            sendTask();
         }
 
         function bindHorizontalWheelScroll(element) {
@@ -1176,11 +1234,20 @@
                 settings: `
                     <div class="toolbox-card">
                         <h3>User Settings</h3>
-                        <p>Visible settings restored here instead of cluttering the composer.</p>
+                        <p>Configure how Hermes should answer, obey preferences, and send messages.</p>
                         <label class="mcp-card-meta">Profile</label>
                         <select class="toolbox-input"><option>default</option></select>
                         <label class="mcp-card-meta">Workspace</label>
                         <select class="toolbox-input"><option>Home</option><option>Workspace: Root</option></select>
+                        <label class="mcp-card-meta" for="send-mode">Reply Shortcut</label>
+                        <select class="toolbox-input" id="send-mode" onchange="persistUserSetting('sendMode', this.value)">
+                            <option value="ctrl-enter" ${state.sendMode === 'ctrl-enter' ? 'selected' : ''}>Ctrl+Enter to send</option>
+                            <option value="enter" ${state.sendMode === 'enter' ? 'selected' : ''}>Enter to send</option>
+                        </select>
+                        <label class="mcp-card-meta" for="ai-preferences">AI Preferences</label>
+                        <textarea class="toolbox-input" id="ai-preferences" placeholder="例如：請優先使用繁中、先給結論、必要時列出驗證證據。" oninput="persistUserSetting('aiPreferences', this.value)">${escapeHtml(state.aiPreferences)}</textarea>
+                        <label class="mcp-card-meta" for="user-rules">User Rules</label>
+                        <textarea class="toolbox-input" id="user-rules" placeholder="例如：禁止刪除檔案、修改前先說明風險、遇到權限才詢問。" oninput="persistUserSetting('userRules', this.value)">${escapeHtml(state.userRules)}</textarea>
                         <label class="mcp-card-meta">Flow Test Provider</label>
                         <select class="toolbox-input"><option>Mock Demo (UI流程測試，非真實回答)</option></select>
                     </div>
@@ -1199,6 +1266,16 @@
             document.querySelectorAll('.session-item[data-session]').forEach(item => {
                 item.style.display = item.textContent.toLowerCase().includes(q) ? '' : 'none';
             });
+        }
+
+        function persistUserSetting(key, value) {
+            state[key] = value;
+            const storageKey = {
+                sendMode: 'hermes_send_mode',
+                aiPreferences: 'hermes_ai_preferences',
+                userRules: 'hermes_user_rules'
+            }[key];
+            if (storageKey) localStorage.setItem(storageKey, value);
         }
 
         /* === Message Rendering === */
@@ -1250,6 +1327,31 @@
 
             terminal.appendChild(container);
             terminal.scrollTop = terminal.scrollHeight;
+            return container;
+        }
+
+        function appendAgentProgress(text) {
+            const terminal = document.getElementById('terminal');
+            const container = document.createElement('div');
+            container.className = 'msg-container';
+            container.innerHTML = `
+                <div class="agent-progress">
+                    <span class="spinner" aria-hidden="true"></span>
+                    <span class="progress-text">${escapeHtml(text || 'Hermes is reading...')}</span>
+                </div>
+            `;
+            terminal.appendChild(container);
+            terminal.scrollTop = terminal.scrollHeight;
+            return container;
+        }
+
+        function updateAgentProgress(container, text, status = 'done') {
+            if (!container) return;
+            const progress = container.querySelector('.agent-progress');
+            const label = container.querySelector('.progress-text');
+            if (!progress || !label) return;
+            progress.classList.add(status);
+            label.textContent = text;
         }
 
         /* === API Interaction === */
@@ -1317,17 +1419,44 @@
             taskInput.value = '';
             taskInput.style.height = 'auto';
             taskInput.focus();
+            state.agentStatus = 'EXECUTING';
+            updateUI();
+            const progress = appendAgentProgress('Hermes is reading your request...');
 
             try {
-                const resp = await fetch('/api/task', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ task: text, model: state.model })
-                });
-                const res = await resp.json();
-                if (!res.ok) appendMessage('reply', { text: `System Error: ${res.detail}` });
+                const payload = window.HermesApi
+                    ? await window.HermesApi.sendTask({
+                        task: text,
+                        model: state.model,
+                        user_preferences: state.aiPreferences,
+                        user_rules: state.userRules
+                    })
+                    : await (async () => {
+                        const resp = await fetch('/api/task', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ task: text, model: state.model })
+                        });
+                        const data = await resp.json();
+                        if (!resp.ok) throw new Error(data.detail || data.error || `HTTP ${resp.status}`);
+                        return data;
+                    })();
+                const result = payload.result || payload;
+                if (result?.error) {
+                    updateAgentProgress(progress, 'Hermes finished with an error.', 'error');
+                    appendMessage('reply', { text: `System Error: ${result.error}` });
+                } else {
+                    updateAgentProgress(progress, 'Hermes finished reading and responding.', 'done');
+                    const reply = result?.response || result?.message || payload.message || 'Hermes completed the task. Check Trace, Tools, MCP, or Logs for details.';
+                    appendMessage('reply', { text: reply });
+                }
+                await syncLogs();
             } catch (e) {
-                appendMessage('reply', { text: "Connection to Hermes lost." });
+                updateAgentProgress(progress, 'Hermes could not complete the request.', 'error');
+                appendMessage('reply', { text: `System Error: ${e.message || 'Connection to Hermes lost.'}` });
+            } finally {
+                state.agentStatus = 'IDLE';
+                updateUI();
             }
         }
 
@@ -1358,6 +1487,7 @@
         }
 
         async function fetchLogs() {
+            if (window.HermesApi) return await window.HermesApi.fetchLogs();
             const resp = await fetch('/api/logs');
             return await resp.json();
         }

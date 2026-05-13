@@ -39,10 +39,10 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(runtime.get_status())
         elif route == "/api/logs":
             self._send_json(runtime.monitor.get_serializable_traces())
-        elif route == "/api/files/list":
+        elif route in ("/api/files/list", "/files/list"):
             result = list_workspace_files(runtime.constraints.workspace_root, query.get("path", ["."])[0])
             self._send_json(result, status_from_result(result))
-        elif route == "/api/files/read":
+        elif route in ("/api/files/read", "/files/read"):
             result = read_workspace_file(runtime.constraints.workspace_root, query.get("path", [""])[0])
             self._send_json(result, status_from_result(result))
         elif route == "/api/shell/pending":
