@@ -144,6 +144,50 @@ async def execute_shell_action(proposal_id: str = Body(...), token: str = Body(.
 async def get_sessions():
     return runtime.memory.semantic.data
 
+@app.get("/api/files/list")
+async def list_files(path: str = "."):
+    from pathlib import Path
+    ok, abs_path_str = runtime.constraints.validate_path(path)
+    if not ok:
+        raise HTTPException(status_code=403, detail=abs_path_str)
+    
+    p = Path(abs_path_str)
+    if not p.exists():
+         # 容錯：如果 path 是相對路徑但 validate_path 沒處理好，這裡做二次確認
+         p = (runtime.constraints.workspace_root / path).resolve()
+         
+    if not p.is_dir():
+        raise HTTPException(status_code=400, detail="Path is not a directory.")
+    
+    items = []
+    try:
+        # 獲取禁止訪問的清單
+        forbidden = runtime.constraints.forbidden_segments
+        
+        for item in p.iterdir():
+            # 安全過濾：禁止項目或隱藏項目 (除了 .gitignore)
+            if item.name in forbidden or (item.name.startswith('.') and item.name != '.gitignore'):
+                continue
+            
+            try:
+                rel_path = item.relative_to(runtime.constraints.workspace_root)
+            except ValueError:
+                continue # 不在 workspace 內則跳過
+                
+            items.append({
+                "name": item.name,
+                "path": str(rel_path).replace("\\", "/"),
+                "type": "directory" if item.is_dir() else "file",
+                "size": item.stat().st_size if item.is_file() else 0
+            })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+        
+    # 按類型排序 (目錄優先) 然後按名稱
+    items.sort(key=lambda x: (x['type'] != 'directory', x['name'].lower()))
+    
+    return {"ok": True, "root": path, "items": items}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

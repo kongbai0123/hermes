@@ -305,6 +305,22 @@
             min-height: 110px;
             max-height: 190px;
             overflow-y: auto;
+            position: relative;
+        }
+        .trace-panel::after,
+        .tool-result-preview::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(0deg, rgba(0, 242, 255, 0.03) 1px, transparent 1px);
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 10;
+            animation: scanline 20s linear infinite;
+        }
+        @keyframes scanline {
+            from { background-position: 0 0; }
+            to { background-position: 0 100%; }
         }
         .trace-panel-header,
         .tool-result-preview-title {
@@ -516,9 +532,20 @@
             font-weight: 700;
         }
         .status-chip.risk {
-            border-color: rgba(255, 0, 255, 0.38);
+            border-color: #ffaa00;
+            color: #ffaa00;
+            background: rgba(255, 170, 0, 0.1);
+        }
+        .status-chip.risk.high {
+            border-color: var(--secondary);
             color: var(--secondary);
-            background: rgba(255, 0, 255, 0.06);
+            background: rgba(255, 0, 255, 0.1);
+            animation: chip-pulse 2s infinite;
+        }
+        @keyframes chip-pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 0, 255, 0.4); }
+            70% { box-shadow: 0 0 0 6px rgba(255, 0, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 0, 255, 0); }
         }
         .managed-workspace {
             display: grid;
@@ -603,16 +630,165 @@
         .node-role {
             display: block;
             color: var(--primary);
-            font-size: 11px;
-            font-weight: 800;
-            margin-bottom: 3px;
+            font-size: 12px;
+            font-weight: 900;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         .node-detail {
             display: block;
             color: #8b949e;
-            font-size: 10px;
-            line-height: 1.45;
+            font-size: 11px;
+            line-height: 1.5;
             word-break: break-word;
+        }
+        .management-panel .chain-node.active {
+            border-color: var(--primary);
+            background: rgba(0, 242, 255, 0.05);
+            box-shadow: inset 0 0 10px rgba(0, 242, 255, 0.1);
+        }
+
+        /* === Workbench & Tabs === */
+        .workbench-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+            padding: 10px 12px 5px 12px;
+        }
+        .workbench-tab {
+            background: transparent;
+            border: none;
+            color: #666;
+            font-family: "Orbitron", sans-serif;
+            font-size: 0.75em;
+            cursor: pointer;
+            padding: 5px 10px;
+            transition: all 0.3s;
+            position: relative;
+        }
+        .workbench-tab.active {
+            color: var(--primary);
+            text-shadow: 0 0 8px var(--primary);
+        }
+        .workbench-tab.active::after {
+            content: "";
+            position: absolute;
+            bottom: -6px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+        }
+        .workbench-panel.hidden {
+            display: none;
+        }
+        .workbench-panel {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        /* === File Tree === */
+        .file-tree {
+            font-family: "Share Tech Mono", monospace;
+            font-size: 0.85em;
+            color: #aaa;
+            max-height: 100%;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        .file-node {
+            padding: 6px 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 4px;
+            transition: all 0.2s;
+            margin-bottom: 2px;
+        }
+        .file-node:hover {
+            background: rgba(0, 242, 255, 0.08);
+            color: var(--primary);
+            padding-left: 12px;
+        }
+        .file-node.directory {
+            font-weight: bold;
+            color: var(--accent);
+        }
+        .file-icon {
+            font-size: 1.1em;
+            width: 16px;
+            text-align: center;
+        }
+
+        /* === Tool Result Cards === */
+        .tool-result-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin-bottom: 12px;
+            overflow: hidden;
+            transition: border-color 0.3s;
+        }
+        .tool-result-card:hover {
+            border-color: var(--primary);
+        }
+        .tool-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid var(--border);
+            font-family: "Orbitron", sans-serif;
+            font-size: 0.75em;
+        }
+        .tool-card-status {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        .tool-card-status.success { background: rgba(0, 255, 0, 0.1); color: #00ff00; }
+        .tool-card-status.error { background: rgba(255, 0, 0, 0.1); color: #ff3333; }
+        .tool-card-status.blocked { background: rgba(255, 255, 0, 0.1); color: #ffff00; }
+        .tool-card-status.pending { background: rgba(0, 242, 255, 0.1); color: var(--primary); }
+        
+        .tool-card-summary {
+            padding: 10px 12px;
+            font-size: 0.9em;
+            line-height: 1.4;
+            color: #ccc;
+        }
+        .tool-card-details {
+            padding: 0 12px 10px 12px;
+        }
+        .tool-card-details summary {
+            font-size: 0.75em;
+            color: #666;
+            cursor: pointer;
+            margin-bottom: 5px;
+            outline: none;
+            user-select: none;
+        }
+        .tool-card-details pre {
+            font-size: 0.8em;
+            background: #000;
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            max-height: 200px;
+            overflow: auto;
+            color: #888;
+        }
+        .management-panel .chain-node.complete {
+            border-color: #0f0;
+            background: rgba(0, 255, 0, 0.03);
         }
         .detail-tabs {
             display: flex;
@@ -635,6 +811,12 @@
             color: #000;
             background: var(--primary);
             border-color: var(--primary);
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.4);
+        }
+        .detail-tab:hover:not(.active) {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: rgba(0, 242, 255, 0.08);
         }
         .detail-panel {
             display: none;
@@ -906,7 +1088,7 @@
                 <h3 class="en-title">TERMINAL</h3>
                 <span class="logo-zh" style="font-size:0.9em;">終端機</span>
                 <span class="permission-badge" id="permission-badge">MODE: MANAGED_AGENT</span>
-                <div class="neon-dot"></div>
+                <div class="neon-dot" id="risk-gate-status" data-tip="Risk Gate: 監控當前任務安全等級。"></div>
             </div>
 
             <div class="command-bar">
@@ -931,40 +1113,57 @@
                     <div class="log-terminal" id="terminal"></div>
                 </section>
 
-                <aside class="management-panel">
-                    <div class="panel-title-row">
-                        <span>MANAGEMENT CHAIN</span>
-                        <span class="panel-kicker">Decision Visible</span>
+                <aside class="management-panel right-workbench" id="right-workbench">
+                    <div class="workbench-tabs">
+                        <button class="workbench-tab active" data-tab="decision" onclick="switchWorkbenchTab('decision')">Decision</button>
+                        <button class="workbench-tab" data-tab="files" onclick="switchWorkbenchTab('files')">Files</button>
                     </div>
-                    <div class="command-chain" id="command-chain">
-                        <div class="chain-line"></div>
-                        <div class="chain-node" id="node-l1">
-                            <div class="node-dot"></div>
-                            <div class="node-copy">
-                                <span class="node-role">L1 Executive</span>
-                                <span class="node-detail" id="node-l1-detail">Intent: waiting</span>
+                    
+                    <div id="workbench-decision" class="workbench-panel">
+                        <div class="panel-title-row">
+                            <span>MANAGEMENT CHAIN</span>
+                            <span class="panel-kicker">Decision Visible</span>
+                        </div>
+                        <div class="command-chain" id="command-chain">
+                            <div class="chain-line"></div>
+                            <div class="chain-node" id="node-l1">
+                                <div class="node-dot"></div>
+                                <div class="node-copy">
+                                    <span class="node-role">L1 Executive</span>
+                                    <span class="node-detail" id="node-l1-detail">Intent: waiting</span>
+                                </div>
+                            </div>
+                            <div class="chain-node" id="node-l2">
+                                <div class="node-dot"></div>
+                                <div class="node-copy">
+                                    <span class="node-role">L2 Strategy</span>
+                                    <span class="node-detail" id="node-l2-detail">Steps: waiting</span>
+                                </div>
+                            </div>
+                            <div class="chain-node" id="node-l3">
+                                <div class="node-dot"></div>
+                                <div class="node-copy">
+                                    <span class="node-role">L3 Operator</span>
+                                    <span class="node-detail" id="node-l3-detail">Tool calls: waiting</span>
+                                </div>
+                            </div>
+                            <div class="chain-node" id="node-l4">
+                                <div class="node-dot"></div>
+                                <div class="node-copy">
+                                    <span class="node-role">L4 Auditor</span>
+                                    <span class="node-detail" id="node-l4-detail">Verified: waiting</span>
+                                </div>
                             </div>
                         </div>
-                        <div class="chain-node" id="node-l2">
-                            <div class="node-dot"></div>
-                            <div class="node-copy">
-                                <span class="node-role">L2 Strategy</span>
-                                <span class="node-detail" id="node-l2-detail">Steps: waiting</span>
-                            </div>
+                    </div>
+
+                    <div id="workbench-files" class="workbench-panel hidden">
+                        <div class="panel-title-row">
+                            <span>FILE EXPLORER</span>
+                            <button class="mini-action-btn" style="padding:2px 8px; font-size:0.7em;" onclick="loadFileTree()">REFRESH</button>
                         </div>
-                        <div class="chain-node" id="node-l3">
-                            <div class="node-dot"></div>
-                            <div class="node-copy">
-                                <span class="node-role">L3 Operator</span>
-                                <span class="node-detail" id="node-l3-detail">Tool calls: waiting</span>
-                            </div>
-                        </div>
-                        <div class="chain-node" id="node-l4">
-                            <div class="node-dot"></div>
-                            <div class="node-copy">
-                                <span class="node-role">L4 Auditor</span>
-                                <span class="node-detail" id="node-l4-detail">Verified: waiting</span>
-                            </div>
+                        <div class="file-tree" id="file-tree-root">
+                            <div class="trace-empty" style="padding:20px;">正在讀取工作區...</div>
                         </div>
                     </div>
                 </aside>
@@ -999,7 +1198,7 @@
                             <span>TOOL RESULT PREVIEW</span>
                             <span>SAFE VIEW</span>
                         </div>
-                        <pre id="tool-result-preview-body" class="tool-result-empty">尚無工具結果</pre>
+                        <div id="tool-result-preview-body" class="tool-result-empty">尚無工具結果</div>
                     </div>
                 </div>
 
@@ -1058,6 +1257,76 @@
             en: { lang: "LANGUAGE", model: "ENGINE", temp: "TEMPERATURE", token: "TOKEN USAGE", sys_prompt: "SYSTEM ROLE", run: "RUN AGENT", p_set: "Settings" }
         };
         const SYSTEM_PROMPT_STORAGE_KEY = 'hermes_system_prompt';
+
+        /* === Workbench Controls === */
+        let currentWorkspacePath = ".";
+        function switchWorkbenchTab(tabId) {
+            document.querySelectorAll('.workbench-tab').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tab === tabId);
+            });
+            document.getElementById('workbench-decision').classList.toggle('hidden', tabId !== 'decision');
+            document.getElementById('workbench-files').classList.toggle('hidden', tabId !== 'files');
+            if (tabId === 'files') loadFileTree(currentWorkspacePath);
+        }
+
+        async function loadFileTree(path) {
+            if (path !== undefined) currentWorkspacePath = path;
+            const rootEl = document.getElementById('file-tree-root');
+            if (!rootEl) return;
+            try {
+                const resp = await fetch(`/api/files/list?path=${encodeURIComponent(currentWorkspacePath)}`);
+                const data = await resp.json();
+                if (data.ok) renderFileTree(data.items, rootEl);
+                else rootEl.innerHTML = `<div class="trace-empty" style="color:var(--secondary);">Error: ${data.detail}</div>`;
+            } catch (e) {
+                rootEl.innerHTML = `<div class="trace-empty" style="color:var(--secondary);">Connection Failed</div>`;
+            }
+        }
+
+        function renderFileTree(items, container) {
+            container.innerHTML = '';
+            if (items.length === 0) {
+                container.innerHTML = '<div class="trace-empty">Empty Workspace</div>';
+                return;
+            }
+            items.forEach(item => {
+                const node = document.createElement('div');
+                node.className = `file-node ${item.type}`;
+                const icon = item.type === 'directory' ? '📁' : '📄';
+                const sizeStr = item.size ? ` (${(item.size / 1024).toFixed(1)}KB)` : '';
+                node.innerHTML = `<span class="file-icon">${icon}</span><span class="file-name">${item.name}${sizeStr}</span>`;
+                node.onclick = () => {
+                    if (item.type === 'directory') loadFileTree(item.path);
+                    else console.log("Previewing file:", item.path); // Future expansion: file preview
+                };
+                container.appendChild(node);
+            });
+            // Add a "Go Up" button if not in root
+            // (Simple version for now: REFRESH acts as reset to root)
+        }
+
+        /* === Markdown & Content Formatting === */
+        function escapeHtml(text) {
+            if (typeof text !== 'string') return text;
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        function renderBasicMarkdown(text) {
+            if (!text) return '';
+            let html = escapeHtml(text);
+            // Code blocks
+            html = html.replace(/```([\s\S]*?)```/g, (match, code) => {
+                return `<pre style="background:#000; padding:10px; border-radius:4px; margin:10px 0; border:1px solid var(--border); overflow:auto;"><code>${code.trim()}</code></pre>`;
+            });
+            // Inline code
+            html = html.replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.1); padding:2px 4px; border-radius:3px; font-family:monospace;">$1</code>');
+            // Bold
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            // Newlines
+            html = html.replace(/\n/g, '<br>');
+            return html;
+        }
 
         function changeScene(scene) {
             const body = document.body;
@@ -1245,7 +1514,7 @@
 
             const body = document.createElement('div');
             body.className = 'agent-reply-body';
-            body.textContent = result.error || result.response || 'Hermes 沒有產生文字回覆。';
+            body.innerHTML = renderBasicMarkdown(result.error || result.response || 'Hermes 沒有產生文字回覆。');
 
             row.appendChild(label);
             row.appendChild(body);
@@ -1341,14 +1610,51 @@
             return null;
         }
 
+        function renderToolResultCard(log) {
+            const data = log.data || {};
+            const result = data.tool_result || data.result || data;
+            const toolName = data.tool || log.action || 'Unknown Tool';
+            const status = data.ok === false || log.action?.includes('FAILED') ? 'error' : 'success';
+            const time = getLogTime(log);
+            
+            return `
+                <div class="tool-result-card">
+                    <div class="tool-card-header">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span>${escapeHtml(toolName)}</span>
+                            <span class="tool-card-status ${status}">${status.toUpperCase()}</span>
+                        </div>
+                        <span style="color:#555;">${time}</span>
+                    </div>
+                    <div class="tool-card-summary">
+                        ${renderBasicMarkdown(formatTraceData(result).substring(0, 500))}
+                        ${formatTraceData(result).length > 500 ? '...' : ''}
+                    </div>
+                    <details class="tool-card-details">
+                        <summary>VIEW RAW DATA</summary>
+                        <pre>${escapeHtml(formatTraceData(data))}</pre>
+                    </details>
+                </div>
+            `;
+        }
+
         function renderToolResultPreview(logs) {
             const previewBody = document.getElementById('tool-result-preview-body');
             if (!previewBody) return;
-            const latestToolResult = getLatestToolResult(logs);
-            previewBody.classList.toggle('tool-result-empty', !latestToolResult);
-            previewBody.textContent = latestToolResult
-                ? formatTraceData(latestToolResult.data?.tool_result || latestToolResult.data?.result || latestToolResult.data)
-                : '尚無工具結果';
+            
+            const toolResults = (logs || []).filter(log => {
+                const kind = getTraceEventKind(log.action, log.data);
+                return kind === 'tool-result' || log.data?.tool_result || log.data?.result;
+            }).slice(-5).reverse(); // Show last 5 results
+
+            if (toolResults.length === 0) {
+                previewBody.innerHTML = '<div class="trace-empty">尚無工具結果</div>';
+                previewBody.className = 'tool-result-empty';
+                return;
+            }
+
+            previewBody.className = '';
+            previewBody.innerHTML = toolResults.map(log => renderToolResultCard(log)).join('');
         }
 
         function switchDetailTab(tabName) {
@@ -1502,8 +1808,21 @@
 
             const riskChip = document.getElementById('risk-chip');
             const approvalChip = document.getElementById('approval-chip');
-            if (riskChip) riskChip.textContent = `Risk: ${executive.risk_level || '--'}`;
-            if (approvalChip) approvalChip.textContent = `Approval: ${executive.requires_user_approval ? 'Required' : executive.risk_level ? 'Not Required' : '--'}`;
+            const riskGateStatus = document.getElementById('risk-gate-status');
+            
+            if (riskChip) {
+                riskChip.textContent = `Risk: ${executive.risk_level || '--'}`;
+                const isHigh = executive.risk_level === 'high' || executive.risk_level === 'requires_user_approval';
+                riskChip.classList.toggle('high', isHigh);
+                if (riskGateStatus) {
+                    riskGateStatus.style.background = isHigh ? 'var(--secondary)' : executive.risk_level === 'medium' ? '#ffaa00' : 'var(--primary)';
+                    riskGateStatus.style.boxShadow = isHigh ? '0 0 10px var(--secondary)' : executive.risk_level === 'medium' ? '0 0 10px #ffaa00' : '0 0 10px var(--primary)';
+                }
+            }
+            if (approvalChip) {
+                approvalChip.textContent = `Approval: ${executive.requires_user_approval ? 'Required' : executive.risk_level ? 'Not Required' : '--'}`;
+                approvalChip.style.borderColor = executive.requires_user_approval ? 'var(--secondary)' : '';
+            }
 
             const l1 = document.getElementById('node-l1-detail');
             const l2 = document.getElementById('node-l2-detail');
@@ -1540,6 +1859,12 @@
                 updateCommandChain(logs);
                 updateManagementDetails(logs);
                 autoSelectDetailTab(logs);
+                
+                // 同步右側工作台檔案樹 (僅在開啟時)
+                const filesTab = document.querySelector('.workbench-tab[data-tab="files"]');
+                if (filesTab && filesTab.classList.contains('active')) {
+                    loadFileTree(currentWorkspacePath);
+                }
             } catch (e) {}
         }
 

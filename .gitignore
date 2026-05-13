@@ -43,8 +43,7 @@ secrets.json
 *.log
 *.tmp
 hermes_metrics.json
-optimization/memory_semantic.json
-optimization/memory_semantic.json.*
+optimization/
 
 # Local model storage
 ollama/
