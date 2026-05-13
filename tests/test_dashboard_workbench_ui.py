@@ -23,6 +23,9 @@ class TestDashboardWorkbenchUI(unittest.TestCase):
         self.assertIn(".workspace-tabs::-webkit-scrollbar", self.dashboard)
         self.assertIn("bindHorizontalWheelScroll", self.dashboard)
         self.assertIn("deltaY", self.dashboard)
+        self.assertIn("@media (max-width: 1180px)", self.dashboard)
+        self.assertIn("grid-template-areas", self.dashboard)
+        self.assertIn("minmax(0, 1fr)", self.dashboard)
 
     def test_sidebar_replaces_placeholder_tools_with_management_roles(self):
         self.assertIn("Management Decision Layer", self.dashboard)
@@ -50,6 +53,9 @@ class TestDashboardWorkbenchUI(unittest.TestCase):
         self.assertIn("SESSION_CONTENT", self.dashboard)
         self.assertIn("data-session=", self.dashboard)
         self.assertIn("renderSessionHistory", self.dashboard)
+        self.assertIn("session-delete-btn", self.dashboard)
+        self.assertIn("deleteSession", self.dashboard)
+        self.assertIn("hermes_deleted_sessions", self.dashboard)
 
     def test_module_rail_buttons_have_real_actions(self):
         self.assertIn("bindModuleRailActions", self.dashboard)
@@ -84,6 +90,8 @@ class TestDashboardWorkbenchUI(unittest.TestCase):
         self.assertIn("payload.result", self.dashboard)
         self.assertIn("provider: state.provider", self.dashboard)
         self.assertIn('provider: "ollama"', self.dashboard)
+        self.assertIn("response_speed: state.responseSpeed", self.dashboard)
+        self.assertIn("temperature: speed.temperature", self.dashboard)
         self.assertNotIn("System Error: ${res.detail}", self.dashboard)
 
     def test_user_settings_include_ai_preferences_and_enter_mode(self):
@@ -93,6 +101,12 @@ class TestDashboardWorkbenchUI(unittest.TestCase):
         self.assertIn("Enter to send", self.dashboard)
         self.assertIn("Ctrl+Enter to send", self.dashboard)
         self.assertIn("handleComposerKeydown", self.dashboard)
+        self.assertIn("language-setting", self.dashboard)
+        self.assertIn("繁體中文", self.dashboard)
+        self.assertIn("response-speed", self.dashboard)
+        self.assertIn("Fast / concise", self.dashboard)
+        self.assertIn("Deep / slower", self.dashboard)
+        self.assertIn("applyLanguage", self.dashboard)
 
 
 if __name__ == "__main__":

@@ -32,8 +32,8 @@
             --danger: #F87171;
             --info: #60A5FA;
 
-            --sidebar-width: 260px;
-            --workspace-width: 380px;
+            --sidebar-width: clamp(220px, 17vw, 280px);
+            --workspace-width: clamp(300px, 25vw, 420px);
             --radius-sm: 6px;
             --radius-md: 10px;
             --radius-lg: 14px;
@@ -49,13 +49,15 @@
             -webkit-font-smoothing: antialiased;
             margin: 0;
             display: grid;
-            grid-template-columns: var(--sidebar-width) 1fr var(--workspace-width);
+            grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--workspace-width);
+            grid-template-areas: "sidebar main workspace";
             height: 100vh;
             overflow: hidden;
         }
 
         /* Sidebar */
         .sidebar {
+            grid-area: sidebar;
             background: var(--bg-panel);
             border-right: 1px solid var(--border-subtle);
             display: flex;
@@ -211,18 +213,45 @@
             letter-spacing: 0.08em;
         }
         .session-item {
-            padding: 8px 12px;
+            padding: 0;
             border-radius: var(--radius-sm);
             font-size: 13px;
             color: var(--text-secondary);
             cursor: pointer;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 28px;
+            align-items: center;
+            gap: 4px;
+            min-width: 0;
         }
         .session-item.active {
             background: rgba(255, 255, 255, 0.03);
             color: var(--accent);
+        }
+        .session-title {
+            padding: 8px 0 8px 12px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .session-delete-btn {
+            width: 24px;
+            height: 24px;
+            margin-right: 4px;
+            border: 0;
+            border-radius: var(--radius-sm);
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            opacity: 0;
+        }
+        .session-item:hover .session-delete-btn,
+        .session-item:focus-within .session-delete-btn {
+            opacity: 1;
+        }
+        .session-delete-btn:hover {
+            color: var(--danger);
+            background: rgba(248, 113, 113, 0.1);
         }
         .toolbox-card {
             border: 1px solid var(--border-subtle);
@@ -265,6 +294,7 @@
 
         /* Main Content */
         .main-content {
+            grid-area: main;
             display: flex;
             flex-direction: column;
             background: var(--bg-app);
@@ -456,9 +486,11 @@
 
         /* Workspace Panels */
         .workspace-area {
+            grid-area: workspace;
             background: var(--bg-panel);
             display: flex;
             flex-direction: column;
+            min-width: 0;
         }
         .workspace-tabs {
             display: flex;
@@ -760,6 +792,73 @@
         .chain-node.active .node-title { color: var(--accent); }
         .chain-node.complete .node-title { color: var(--success); }
         .preview-body { flex: 1; padding: 24px; overflow: auto; font-family: var(--font-mono); font-size: 13px; color: #ccc; white-space: pre-wrap; }
+
+        @media (max-width: 1180px) {
+            body {
+                --sidebar-width: 220px;
+                --workspace-width: 320px;
+            }
+            .message-stream {
+                padding-inline: 32px;
+            }
+        }
+        @media (max-width: 960px) {
+            body {
+                grid-template-columns: 72px minmax(0, 1fr) minmax(260px, 32vw);
+            }
+            .sidebar {
+                padding-inline: 0;
+            }
+            .brand-name,
+            .nav-item span:not(:first-child),
+            .decision-nav-title,
+            .decision-role span:not(.decision-role-code),
+            .section-label,
+            .session-list {
+                display: none;
+            }
+            .sidebar-brand,
+            .sidebar-nav,
+            .decision-nav {
+                padding-inline: 12px;
+            }
+            .nav-item {
+                justify-content: center;
+            }
+        }
+        @media (max-width: 760px) {
+            body {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto minmax(0, 1fr) minmax(220px, 34vh);
+                grid-template-areas:
+                    "sidebar"
+                    "main"
+                    "workspace";
+            }
+            .sidebar {
+                flex-direction: row;
+                align-items: center;
+                overflow-x: auto;
+                padding: 10px;
+                border-right: 0;
+                border-bottom: 1px solid var(--border-subtle);
+            }
+            .sidebar-brand {
+                margin: 0;
+                padding: 0 8px;
+            }
+            .sidebar-nav,
+            .module-rail,
+            .decision-nav {
+                display: none;
+            }
+            .message-stream {
+                padding: 24px 18px;
+            }
+            .composer-area {
+                padding: 0 12px 12px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -773,24 +872,24 @@
 
         <nav class="sidebar-nav">
             <div class="nav-item active" onclick="startNewChat()">
-                <span>✎</span> New Chat
+                <span>✎</span> <span data-i18n="nav.newChat">New Chat</span>
             </div>
             <div class="nav-item" onclick="openToolBox('search')">
-                <span>⌕</span> Search
+                <span>⌕</span> <span data-i18n="nav.search">Search</span>
             </div>
             <div class="nav-item" onclick="openToolBox('extensions')">
-                <span>⌘</span> Extensions
+                <span>⌘</span> <span data-i18n="nav.extensions">Extensions</span>
             </div>
             <div class="nav-item" onclick="openToolBox('automation')">
-                <span>◷</span> Automations <span class="nav-count">1</span>
+                <span>◷</span> <span data-i18n="nav.automations">Automations</span> <span class="nav-count">1</span>
             </div>
             <div class="nav-item" onclick="openUserSettings()">
-                <span>♙</span> User Settings
+                <span>♙</span> <span data-i18n="nav.userSettings">User Settings</span>
             </div>
         </nav>
 
         <div class="decision-nav" aria-label="Management Decision Layer">
-            <div class="decision-nav-title">Management Decision Layer</div>
+            <div class="decision-nav-title" data-i18n="decision.title">Management Decision Layer</div>
             <div class="decision-role active" data-role="executive">
                 <span class="decision-role-code">L1</span><span>Executive</span>
             </div>
@@ -816,17 +915,8 @@
         </div>
 
         <div class="sidebar-section">
-            <div class="section-label">History</div>
+            <div class="section-label" data-i18n="history.title">History</div>
             <div class="session-list" id="session-list">
-                <div class="history-group">PINNED</div>
-                <div class="session-item active" data-session="upgrade" onclick="loadSession('upgrade')">Can you lead an upgraded version of Hermes?</div>
-                <div class="session-item" data-session="profile" onclick="loadSession('profile')">Testing default profile right?</div>
-                <div class="history-group">TODAY</div>
-                <div class="session-item" data-session="time" onclick="loadSession('time')">What time is it?</div>
-                <div class="session-item" data-session="mcp" onclick="loadSession('mcp')">MCP workspace read check</div>
-                <div class="history-group">EARLIER</div>
-                <div class="session-item" data-session="browser" onclick="loadSession('browser')">Full sweep browser check</div>
-                <div class="session-item" data-session="qa" onclick="loadSession('qa')">QA sanity check message 1</div>
             </div>
         </div>
     </aside>
@@ -1024,12 +1114,16 @@
             agentStatus: "IDLE",
             logs: [],
             lastLogIndex: -1,
+            language: localStorage.getItem('hermes_language') || 'en',
             sendMode: localStorage.getItem('hermes_send_mode') || 'ctrl-enter',
+            responseSpeed: localStorage.getItem('hermes_response_speed') || 'balanced',
             aiPreferences: localStorage.getItem('hermes_ai_preferences') || '',
-            userRules: localStorage.getItem('hermes_user_rules') || ''
+            userRules: localStorage.getItem('hermes_user_rules') || '',
+            deletedSessions: JSON.parse(localStorage.getItem('hermes_deleted_sessions') || '[]')
         };
         const SESSION_CONTENT = {
             upgrade: {
+                group: "PINNED",
                 title: "Can you lead an upgraded version of Hermes?",
                 messages: [
                     { type: "user", text: "Can you lead an upgraded version of Hermes?" },
@@ -1037,6 +1131,7 @@
                 ]
             },
             profile: {
+                group: "PINNED",
                 title: "Testing default profile right?",
                 messages: [
                     { type: "user", text: "Testing default profile right?" },
@@ -1044,6 +1139,7 @@
                 ]
             },
             time: {
+                group: "TODAY",
                 title: "What time is it?",
                 messages: [
                     { type: "user", text: "What time is it?" },
@@ -1051,6 +1147,7 @@
                 ]
             },
             mcp: {
+                group: "TODAY",
                 title: "MCP workspace read check",
                 messages: [
                     { type: "user", text: "請用 MCP 讀取 README.md" },
@@ -1058,6 +1155,7 @@
                 ]
             },
             browser: {
+                group: "EARLIER",
                 title: "Full sweep browser check",
                 messages: [
                     { type: "user", text: "Full sweep browser check" },
@@ -1065,11 +1163,58 @@
                 ]
             },
             qa: {
+                group: "EARLIER",
                 title: "QA sanity check message 1",
                 messages: [
                     { type: "user", text: "QA sanity check message 1" },
                     { type: "reply", text: "Sanity check session loaded from local dashboard history." }
                 ]
+            }
+        };
+        const UI_TEXT = {
+            en: {
+                "nav.newChat": "New Chat",
+                "nav.search": "Search",
+                "nav.extensions": "Extensions",
+                "nav.automations": "Automations",
+                "nav.userSettings": "User Settings",
+                "decision.title": "Management Decision Layer",
+                "history.title": "History",
+                "settings.title": "User Settings",
+                "settings.description": "Configure how Hermes should answer, obey preferences, and send messages.",
+                "settings.profile": "Profile",
+                "settings.workspace": "Workspace",
+                "settings.language": "Language",
+                "settings.replyShortcut": "Reply Shortcut",
+                "settings.responseSpeed": "Response Speed",
+                "settings.aiPreferences": "AI Preferences",
+                "settings.userRules": "User Rules",
+                "settings.flowProvider": "Flow Test Provider",
+                "history.delete": "Delete chat",
+                "system.newChat": "New chat created. Ask Hermes Agent to plan, inspect, generate, or verify a task.",
+                "system.ready": "Welcome to Hermes Professional Workbench. Ready for execution."
+            },
+            zh: {
+                "nav.newChat": "新聊天",
+                "nav.search": "搜尋",
+                "nav.extensions": "外掛程式",
+                "nav.automations": "自動化",
+                "nav.userSettings": "使用者設定",
+                "decision.title": "管理決策層",
+                "history.title": "歷史紀錄",
+                "settings.title": "使用者設定",
+                "settings.description": "設定 Hermes 的回答偏好、使用者規範與送出方式。",
+                "settings.profile": "個人設定檔",
+                "settings.workspace": "工作區",
+                "settings.language": "語言",
+                "settings.replyShortcut": "回覆快捷鍵",
+                "settings.responseSpeed": "回覆速度",
+                "settings.aiPreferences": "AI 偏好",
+                "settings.userRules": "使用者規範",
+                "settings.flowProvider": "流程測試 Provider",
+                "history.delete": "刪除聊天",
+                "system.newChat": "已建立新聊天。你可以要求 Hermes Agent 規劃、檢查、生成或驗證任務。",
+                "system.ready": "歡迎使用 Hermes 專業工作台。已準備執行。"
             }
         };
         const SYSTEM_PROMPT_STORAGE_KEY = 'hermes_system_prompt';
@@ -1081,6 +1226,7 @@
             bindHorizontalWheelScroll(document.querySelector('.workspace-tabs'));
             bindModuleRailActions();
             renderSessionHistory();
+            applyLanguage();
             updateUI();
             setInterval(syncLogs, 3000);
         });
@@ -1115,6 +1261,21 @@
             textarea.style.height = textarea.scrollHeight + 'px';
         }
 
+        function t(key) {
+            return (UI_TEXT[state.language] && UI_TEXT[state.language][key]) || UI_TEXT.en[key] || key;
+        }
+
+        function applyLanguage() {
+            document.documentElement.lang = state.language === 'zh' ? 'zh-TW' : 'en';
+            document.querySelectorAll('[data-i18n]').forEach(node => {
+                node.textContent = t(node.dataset.i18n);
+            });
+            const input = document.getElementById('task-input');
+            if (input) input.placeholder = state.language === 'zh' ? '訊息 Hermes Agent...' : 'Message Hermes Agent...';
+            const activeTool = document.querySelector('.tab-item.active')?.dataset.tab;
+            if (activeTool === 'tools') renderToolBox('settings');
+        }
+
         function handleComposerKeydown(event) {
             const isEnter = event.key === 'Enter';
             if (!isEnter || event.isComposing) return;
@@ -1136,6 +1297,23 @@
         }
 
         function renderSessionHistory() {
+            const list = document.getElementById('session-list');
+            if (!list) return;
+            const groups = ["PINNED", "TODAY", "EARLIER"];
+            const deleted = new Set(state.deletedSessions);
+            list.innerHTML = groups.map(group => {
+                const sessions = Object.entries(SESSION_CONTENT).filter(([id, session]) => session.group === group && !deleted.has(id));
+                if (!sessions.length) return '';
+                return `
+                    <div class="history-group">${group}</div>
+                    ${sessions.map(([id, session]) => `
+                        <div class="session-item ${state.currentSession === session.title ? 'active' : ''}" data-session="${id}" onclick="loadSession('${id}')">
+                            <span class="session-title">${escapeHtml(session.title)}</span>
+                            <button class="session-delete-btn" type="button" title="${escapeHtml(t('history.delete'))}" aria-label="${escapeHtml(t('history.delete'))}" onclick="deleteSession(event, '${id}')">×</button>
+                        </div>
+                    `).join('')}
+                `;
+            }).join('');
             document.querySelectorAll('.session-item[data-session]').forEach(item => {
                 item.addEventListener('keydown', (event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
@@ -1148,7 +1326,16 @@
             });
         }
 
-        function resetTerminalSystem(text = "Welcome to Hermes Professional Workbench. Ready for execution.") {
+        function deleteSession(event, sessionId) {
+            event.preventDefault();
+            event.stopPropagation();
+            state.deletedSessions = Array.from(new Set([...state.deletedSessions, sessionId]));
+            localStorage.setItem('hermes_deleted_sessions', JSON.stringify(state.deletedSessions));
+            if (state.currentSession === SESSION_CONTENT[sessionId]?.title) startNewChat();
+            renderSessionHistory();
+        }
+
+        function resetTerminalSystem(text = t("system.ready")) {
             const terminal = document.getElementById('terminal');
             terminal.innerHTML = `
                 <div class="agent-reply">
@@ -1161,7 +1348,7 @@
         function startNewChat() {
             state.currentSession = "New Chat";
             state.lastLogIndex = -1;
-            resetTerminalSystem("New chat created. Ask Hermes Agent to plan, inspect, generate, or verify a task.");
+            resetTerminalSystem(t("system.newChat"));
             document.getElementById('task-input').value = '';
             document.getElementById('task-input').focus();
             document.querySelectorAll('.session-item').forEach(item => item.classList.remove('active'));
@@ -1234,22 +1421,33 @@
                 `,
                 settings: `
                     <div class="toolbox-card">
-                        <h3>User Settings</h3>
-                        <p>Configure how Hermes should answer, obey preferences, and send messages.</p>
-                        <label class="mcp-card-meta">Profile</label>
+                        <h3>${escapeHtml(t('settings.title'))}</h3>
+                        <p>${escapeHtml(t('settings.description'))}</p>
+                        <label class="mcp-card-meta">${escapeHtml(t('settings.profile'))}</label>
                         <select class="toolbox-input"><option>default</option></select>
-                        <label class="mcp-card-meta">Workspace</label>
+                        <label class="mcp-card-meta">${escapeHtml(t('settings.workspace'))}</label>
                         <select class="toolbox-input"><option>Home</option><option>Workspace: Root</option></select>
-                        <label class="mcp-card-meta" for="send-mode">Reply Shortcut</label>
+                        <label class="mcp-card-meta" for="language-setting">${escapeHtml(t('settings.language'))}</label>
+                        <select class="toolbox-input" id="language-setting" onchange="persistUserSetting('language', this.value)">
+                            <option value="en" ${state.language === 'en' ? 'selected' : ''}>English</option>
+                            <option value="zh" ${state.language === 'zh' ? 'selected' : ''}>繁體中文</option>
+                        </select>
+                        <label class="mcp-card-meta" for="send-mode">${escapeHtml(t('settings.replyShortcut'))}</label>
                         <select class="toolbox-input" id="send-mode" onchange="persistUserSetting('sendMode', this.value)">
                             <option value="ctrl-enter" ${state.sendMode === 'ctrl-enter' ? 'selected' : ''}>Ctrl+Enter to send</option>
                             <option value="enter" ${state.sendMode === 'enter' ? 'selected' : ''}>Enter to send</option>
                         </select>
-                        <label class="mcp-card-meta" for="ai-preferences">AI Preferences</label>
+                        <label class="mcp-card-meta" for="response-speed">${escapeHtml(t('settings.responseSpeed'))}</label>
+                        <select class="toolbox-input" id="response-speed" onchange="persistUserSetting('responseSpeed', this.value)">
+                            <option value="fast" ${state.responseSpeed === 'fast' ? 'selected' : ''}>Fast / concise</option>
+                            <option value="balanced" ${state.responseSpeed === 'balanced' ? 'selected' : ''}>Balanced</option>
+                            <option value="deep" ${state.responseSpeed === 'deep' ? 'selected' : ''}>Deep / slower</option>
+                        </select>
+                        <label class="mcp-card-meta" for="ai-preferences">${escapeHtml(t('settings.aiPreferences'))}</label>
                         <textarea class="toolbox-input" id="ai-preferences" placeholder="例如：請優先使用繁中、先給結論、必要時列出驗證證據。" oninput="persistUserSetting('aiPreferences', this.value)">${escapeHtml(state.aiPreferences)}</textarea>
-                        <label class="mcp-card-meta" for="user-rules">User Rules</label>
+                        <label class="mcp-card-meta" for="user-rules">${escapeHtml(t('settings.userRules'))}</label>
                         <textarea class="toolbox-input" id="user-rules" placeholder="例如：禁止刪除檔案、修改前先說明風險、遇到權限才詢問。" oninput="persistUserSetting('userRules', this.value)">${escapeHtml(state.userRules)}</textarea>
-                        <label class="mcp-card-meta">Flow Test Provider</label>
+                        <label class="mcp-card-meta">${escapeHtml(t('settings.flowProvider'))}</label>
                         <select class="toolbox-input"><option>Mock Demo (UI流程測試，非真實回答)</option></select>
                     </div>
                 `
@@ -1272,11 +1470,37 @@
         function persistUserSetting(key, value) {
             state[key] = value;
             const storageKey = {
+                language: 'hermes_language',
                 sendMode: 'hermes_send_mode',
+                responseSpeed: 'hermes_response_speed',
                 aiPreferences: 'hermes_ai_preferences',
                 userRules: 'hermes_user_rules'
             }[key];
             if (storageKey) localStorage.setItem(storageKey, value);
+            if (key === 'language') {
+                applyLanguage();
+                renderSessionHistory();
+            }
+        }
+
+        function responseSpeedConfig() {
+            return {
+                fast: {
+                    temperature: 0.4,
+                    instruction: "Prioritize a concise answer and avoid unnecessary detail."
+                },
+                balanced: {
+                    temperature: 0.7,
+                    instruction: "Balance speed, clarity, and useful detail."
+                },
+                deep: {
+                    temperature: 0.9,
+                    instruction: "Use deeper reasoning and include verification evidence when relevant."
+                }
+            }[state.responseSpeed] || {
+                temperature: 0.7,
+                instruction: "Balance speed, clarity, and useful detail."
+            };
         }
 
         /* === Message Rendering === */
@@ -1423,6 +1647,13 @@
             state.agentStatus = 'EXECUTING';
             updateUI();
             const progress = appendAgentProgress('Hermes is reading your request...');
+            const speed = responseSpeedConfig();
+            const preferencePrompt = [
+                state.aiPreferences ? `User AI preferences:\n${state.aiPreferences}` : '',
+                state.userRules ? `User rules:\n${state.userRules}` : '',
+                `Interface language: ${state.language === 'zh' ? 'Traditional Chinese' : 'English'}`,
+                `Reply speed mode: ${state.responseSpeed}. ${speed.instruction}`
+            ].filter(Boolean).join('\n\n');
 
             try {
                 const payload = window.HermesApi
@@ -1430,6 +1661,9 @@
                         task: text,
                         provider: state.provider,
                         model: state.model,
+                        temperature: speed.temperature,
+                        response_speed: state.responseSpeed,
+                        system_prompt: preferencePrompt,
                         user_preferences: state.aiPreferences,
                         user_rules: state.userRules
                     })
@@ -1437,7 +1671,14 @@
                         const resp = await fetch('/api/task', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ task: text, provider: state.provider, model: state.model })
+                            body: JSON.stringify({
+                                task: text,
+                                provider: state.provider,
+                                model: state.model,
+                                temperature: speed.temperature,
+                                response_speed: state.responseSpeed,
+                                system_prompt: preferencePrompt
+                            })
                         });
                         const data = await resp.json();
                         if (!resp.ok) throw new Error(data.detail || data.error || `HTTP ${resp.status}`);
