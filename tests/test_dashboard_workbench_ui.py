@@ -82,6 +82,8 @@ class TestDashboardWorkbenchUI(unittest.TestCase):
         self.assertIn("updateAgentProgress", self.dashboard)
         self.assertIn("Hermes is reading", self.dashboard)
         self.assertIn("payload.result", self.dashboard)
+        self.assertIn("provider: state.provider", self.dashboard)
+        self.assertIn('provider: "ollama"', self.dashboard)
         self.assertNotIn("System Error: ${res.detail}", self.dashboard)
 
     def test_user_settings_include_ai_preferences_and_enter_mode(self):

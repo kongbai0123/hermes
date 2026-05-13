@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 from hermes.core.runtime import HermesRuntime
-from hermes.core.llm_provider import MockLLMProvider, create_llm_provider # 預設使用 Mock 以利展示
+from hermes.core.llm_provider import MockLLMProvider, create_llm_provider
 from hermes.api.files import list_workspace_files, read_workspace_file, status_from_result
 
 app = FastAPI(title="Hermes Agent OS API")
@@ -13,7 +13,7 @@ runtime = HermesRuntime(llm_provider=MockLLMProvider(), mcp_config_path="hermes_
 
 class TaskRequest(BaseModel):
     task: str
-    provider: str = "mock"
+    provider: str = "ollama"
     model: Optional[str] = None
     base_url: str = "http://localhost:11434"
     temperature: float = 0.7

@@ -76,7 +76,7 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
             content_length = int(self.headers['Content-Length'])
             post_data = json.loads(self.rfile.read(content_length))
             task = post_data.get("task", "")
-            provider = post_data.get("provider", "mock")
+            provider = post_data.get("provider", "ollama")
             model = post_data.get("model")
             base_url = post_data.get("base_url", "http://localhost:11434")
             temperature = float(post_data.get("temperature", 0.7))

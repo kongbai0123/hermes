@@ -864,7 +864,7 @@
                             <span class="composer-icon" title="Attach">⌘</span>
                             <span class="composer-icon" title="Voice">♩</span>
                         </div>
-                        <select class="control-btn" id="model-select" onchange="state.model=this.value; updateUI();">
+                        <select class="control-btn" id="model-select" onchange="state.provider='ollama'; state.model=this.value; updateUI();">
                             <option value="qwen3:14b" selected>Qwen3 14B (Ollama)</option>
                             <option value="llama3">Llama 3 (Ollama)</option>
                             <option value="gemma3">Gemma 3 (Ollama)</option>
@@ -1019,6 +1019,7 @@
         let state = {
             currentSession: "Hermes UI Redesign",
             workspace: ".",
+            provider: "ollama",
             model: "qwen3:14b",
             agentStatus: "IDLE",
             logs: [],
@@ -1427,6 +1428,7 @@
                 const payload = window.HermesApi
                     ? await window.HermesApi.sendTask({
                         task: text,
+                        provider: state.provider,
                         model: state.model,
                         user_preferences: state.aiPreferences,
                         user_rules: state.userRules
@@ -1435,7 +1437,7 @@
                         const resp = await fetch('/api/task', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ task: text, model: state.model })
+                            body: JSON.stringify({ task: text, provider: state.provider, model: state.model })
                         });
                         const data = await resp.json();
                         if (!resp.ok) throw new Error(data.detail || data.error || `HTTP ${resp.status}`);
