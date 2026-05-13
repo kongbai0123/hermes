@@ -61,5 +61,36 @@ class TestPatchFlow(unittest.TestCase):
         self.assertTrue((self.test_root / "new_module.py").exists())
         self.assertEqual((self.test_root / "new_module.py").read_text(), "def foo(): pass")
 
+    def test_modify_patch_rejects_stale_source_file(self):
+        changes = [{
+            "path": "hello.py",
+            "operation": "modify",
+            "replacement": "print('new')"
+        }]
+        result = self.executor.propose_patch(task="update greeting", changes=changes)
+        patch_id = result.metadata["patch_id"]
+        token = self.executor.approval_manager.approve(patch_id)
+
+        (self.test_root / "hello.py").write_text("print('changed elsewhere')", encoding="utf-8")
+
+        stale_result = self.executor.apply_approved_patch(patch_id, token)
+
+        self.assertFalse(stale_result.ok)
+        self.assertIn("stale", stale_result.error.lower())
+        self.assertEqual((self.test_root / "hello.py").read_text(), "print('changed elsewhere')")
+
+    def test_delete_patch_is_rejected(self):
+        changes = [{
+            "path": "hello.py",
+            "operation": "delete",
+            "reason": "remove file"
+        }]
+
+        result = self.executor.propose_patch(task="delete file", changes=changes)
+
+        self.assertFalse(result.ok)
+        self.assertIn("Delete operation is disabled", result.error)
+        self.assertTrue((self.test_root / "hello.py").exists())
+
 if __name__ == '__main__':
     unittest.main()

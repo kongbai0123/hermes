@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hermes Agent OS - Cyber Codex</title>
     <style>
+        * { box-sizing: border-box; }
         :root {
             --primary: #00f2ff;
             --secondary: #ff00ff;
@@ -13,7 +14,7 @@
             --border: #1a1a1a;
             --text: #c9d1d9;
             --accent: #58a6ff;
-            --sidebar-width: 320px;
+            --sidebar-width: 300px;
         }
 
         /* === Chinese Font Repair Layer === */
@@ -73,6 +74,7 @@
             padding: 20px;
             gap: 20px;
             min-width: 0;
+            min-height: 0;
         }
 
         /* Cyberpunk Headers */
@@ -258,25 +260,43 @@
         .console-card {
             background: var(--card);
             border: 1px solid var(--border);
-            padding: 20px;
+            padding: 25px;
             flex: 1;
             display: flex;
             flex-direction: column;
+            gap: 20px;
+            min-height: 0;
+            width: 100%;
+        }
+        #task-input {
+            width: 100%;
+            background: #000;
+            border: 1px solid var(--border);
+            color: var(--primary);
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            resize: none;
+            outline: none;
+            border-radius: 4px;
+        }
+        .trace-shell {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 15px;
+            width: 100%;
         }
         .log-terminal {
             flex: 1;
+            min-height: 150px;
             background: #000;
             padding: 15px;
             font-family: 'Courier New', monospace;
             font-size: 13px;
             overflow-y: auto;
             color: #0f0;
-        }
-        .trace-shell {
-            display: grid;
-            grid-template-columns: minmax(260px, 1fr) minmax(260px, 0.9fr);
-            gap: 12px;
+            border: 1px solid var(--border);
+            width: 100%;
         }
         .trace-panel,
         .tool-result-preview {
@@ -348,6 +368,10 @@
             color: var(--primary);
         }
         .agent-reply {
+            display: flex;
+            flex-direction: column;
+            max-height: 56vh;
+            overflow: hidden;
             margin: 8px 0 14px 18px;
             padding: 12px;
             border-left: 1px solid var(--accent);
@@ -355,6 +379,15 @@
             color: var(--text);
             line-height: 1.6;
             white-space: pre-wrap;
+        }
+        .agent-reply-body {
+            min-height: 0;
+            max-height: 48vh;
+            overflow-y: auto;
+            scrollbar-gutter: stable;
+            padding-right: 8px;
+            white-space: pre-wrap;
+            word-break: break-word;
         }
         .agent-reply.error {
             border-left-color: var(--secondary);
@@ -444,6 +477,197 @@
             clip-path: polygon(5% 0, 100% 0, 95% 100%, 0 100%);
         }
 
+        /* Managed Agent Workspace */
+        .console-card.managed-dashboard {
+            display: grid;
+            grid-template-rows: auto auto minmax(0, 1fr) minmax(120px, 18vh);
+            gap: 16px;
+            padding: 20px;
+        }
+        .command-bar {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 160px;
+            gap: 12px;
+            align-items: start;
+        }
+        .command-bar .btn-execute {
+            min-height: 48px;
+            align-self: start;
+            clip-path: polygon(8% 0, 100% 0, 92% 100%, 0 100%);
+        }
+        .command-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 0;
+        }
+        .command-status-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .status-chip {
+            border: 1px solid rgba(0, 242, 255, 0.32);
+            background: rgba(0, 242, 255, 0.06);
+            color: var(--primary);
+            padding: 5px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .status-chip.risk {
+            border-color: rgba(255, 0, 255, 0.38);
+            color: var(--secondary);
+            background: rgba(255, 0, 255, 0.06);
+        }
+        .managed-workspace {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 300px;
+            gap: 16px;
+            min-height: 0;
+        }
+        .reply-panel,
+        .management-panel,
+        .detail-panel {
+            background: #000;
+            border: 1px solid var(--border);
+            min-height: 0;
+        }
+        .reply-panel {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .panel-title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            color: var(--primary);
+            font-size: 12px;
+            font-weight: 800;
+        }
+        .panel-kicker {
+            color: #8b949e;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .reply-panel .log-terminal {
+            flex: 1;
+            min-height: 0;
+            border: 0;
+        }
+        .management-panel {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .management-panel .command-chain {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            justify-content: flex-start;
+            gap: 8px;
+            padding: 10px;
+            border: 0;
+            background: transparent;
+            overflow-y: auto;
+        }
+        .management-panel .chain-line {
+            display: none;
+        }
+        .management-panel .chain-node {
+            align-items: flex-start;
+            display: grid;
+            grid-template-columns: 18px minmax(0, 1fr);
+            gap: 8px;
+            opacity: 0.65;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.03);
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .management-panel .chain-node.active,
+        .management-panel .chain-node.complete {
+            opacity: 1;
+        }
+        .management-panel .node-dot {
+            margin-top: 3px;
+        }
+        .node-copy {
+            min-width: 0;
+        }
+        .node-role {
+            display: block;
+            color: var(--primary);
+            font-size: 11px;
+            font-weight: 800;
+            margin-bottom: 3px;
+        }
+        .node-detail {
+            display: block;
+            color: #8b949e;
+            font-size: 10px;
+            line-height: 1.45;
+            word-break: break-word;
+        }
+        .detail-tabs {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 0 8px;
+            border-bottom: 1px solid var(--border);
+        }
+        .detail-tab {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(0, 242, 255, 0.24);
+            color: #8b949e;
+            cursor: pointer;
+            padding: 8px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 800;
+        }
+        .detail-tab.active {
+            color: #000;
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+        .detail-panel {
+            display: none;
+            height: 100%;
+            overflow: hidden;
+        }
+        .detail-panel.active {
+            display: flex;
+            flex-direction: column;
+        }
+        .detail-shell {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        .detail-shell .detail-panel {
+            min-height: 0;
+        }
+        .detail-panel .trace-panel,
+        .detail-panel .tool-result-preview {
+            flex: 1;
+            min-height: 0;
+            max-height: none;
+            border: 0;
+        }
+        .placeholder-panel {
+            padding: 14px;
+            color: #8b949e;
+            font-size: 12px;
+            line-height: 1.7;
+            overflow-y: auto;
+        }
+
         /* User Panel */
         .user-panel {
             margin-top: auto;
@@ -464,10 +688,93 @@
         }
         .popup-item { padding: 10px; font-size: 0.9em; transition: 0.2s; border-radius: 4px; }
         .popup-item:hover { background: rgba(0, 242, 255, 0.1); color: var(--primary); }
-        .scene-switcher { position: fixed; top: 20px; right: 20px; background: #111; padding: 10px; border: 1px solid var(--border); z-index: 300; }
+        .scene-switcher {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 10px;
+        }
+
+        /* Command Chain Visualization */
+        .command-chain {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            position: relative;
+        }
+        .chain-node {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            z-index: 1;
+            opacity: 0.3;
+            transition: 0.5s;
+        }
+        .chain-node.active { opacity: 1; filter: drop-shadow(0 0 5px var(--primary)); }
+        .chain-node.complete { opacity: 0.8; color: #0f0; }
+        .node-dot {
+            width: 12px; height: 12px; background: #222; border: 2px solid #444; transform: rotate(45deg);
+            transition: 0.5s;
+        }
+        .chain-node.active .node-dot { background: var(--primary); border-color: #fff; box-shadow: 0 0 10px var(--primary); animation: node-pulse 1.5s infinite; }
+        .chain-node.complete .node-dot { background: #0f0; border-color: #0f0; }
+        .node-label { font-size: 10px; font-weight: 900; letter-spacing: 1px; }
+        .chain-line {
+            position: absolute; top: 22px; left: 10%; width: 80%; height: 1px; background: #333; z-index: 0;
+        }
+        @keyframes node-pulse { 0%, 100% { transform: rotate(45deg) scale(1); } 50% { transform: rotate(45deg) scale(1.3); } }
+        /* Patch Review Modal */
+        .patch-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center;
+            z-index: 2000; backdrop-filter: blur(5px);
+        }
+        .patch-modal {
+            width: 80%; max-width: 900px; max-height: 80vh; background: var(--card);
+            border: 2px solid var(--primary); box-shadow: 0 0 30px rgba(0, 242, 255, 0.3);
+            display: flex; flex-direction: column; overflow: hidden; border-radius: 8px;
+        }
+        .patch-header {
+            padding: 15px 20px; border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(0, 242, 255, 0.05);
+        }
+        .patch-body { flex: 1; overflow-y: auto; padding: 20px; font-family: 'Courier New', monospace; }
+        .diff-line { white-space: pre-wrap; padding: 2px 10px; border-radius: 2px; }
+        .diff-add { background: rgba(0, 255, 0, 0.15); color: #afffaf; border-left: 3px solid #0f0; }
+        .diff-del { background: rgba(255, 0, 0, 0.15); color: #ffafaf; border-left: 3px solid #f00; }
+        .diff-meta { color: #888; background: rgba(255,255,255,0.05); }
+        .patch-footer {
+            padding: 15px 20px; border-top: 1px solid var(--border);
+            display: flex; justify-content: flex-end; gap: 12px;
+        }
+        .btn-patch {
+            padding: 10px 20px; border: 1px solid var(--primary); background: transparent;
+            color: var(--primary); cursor: pointer; font-weight: bold; border-radius: 4px;
+        }
+        .btn-patch.approve { background: var(--primary); color: black; }
+        .btn-patch.reject { border-color: var(--secondary); color: var(--secondary); }
         @media (max-width: 900px) {
-            .trace-shell {
+            .console-card.managed-dashboard {
+                grid-template-rows: auto minmax(0, 1fr) minmax(170px, 30vh);
+            }
+            .command-bar,
+            .managed-workspace {
                 grid-template-columns: 1fr;
+            }
+            .command-bar .btn-execute {
+                min-height: 44px;
+            }
+            .management-panel {
+                max-height: 230px;
             }
             .permission-badge {
                 margin-left: 0;
@@ -477,18 +784,6 @@
 </head>
 <body>
     <div id="cyber-tooltip"></div>
-
-    <div class="scene-switcher" id="scene-switcher">
-        <div class="header-container" style="font-size:0.7em;">
-            <span class="en-title">SCENE</span>
-            <div class="neon-dot" data-tip="[用途] 切換介面視覺風格。
-[模式] 深色 (Cyber-Dark) / 淺色 (Standard-Light)"></div>
-        </div>
-        <select id="scene-select" style="font-size:0.7em;" onchange="changeScene(this.value)">
-            <option value="dark">Cyber-Dark</option>
-            <option value="light">Standard-Light</option>
-        </select>
-    </div>
 
     <div class="sidebar" id="sidebar">
         <div class="header-container">
@@ -500,6 +795,18 @@
             </div>
             <div class="neon-dot" data-tip="Hermes 核心引擎：管理狀態機、記憶與執行邏輯。"></div>
         </div>
+
+        <div class="scene-switcher" id="scene-switcher">
+            <div class="header-container" style="font-size:0.7em;">
+                <span class="en-title">SCENE</span>
+                <div class="neon-dot" data-tip="[用途] 切換介面視覺風格。
+[模式] 深色 (Cyber-Dark) / 淺色 (Standard-Light)"></div>
+            </div>
+            <select id="scene-select" style="font-size:0.7em; flex:1;" onchange="changeScene(this.value)">
+                <option value="dark">Cyber-Dark</option>
+                <option value="light">Standard-Light</option>
+            </select>
+        </div>
         
         <div class="setting-group" style="margin-top:10px;">
             <div class="header-container">
@@ -508,11 +815,11 @@
 [範例] Llama3 適合本地極速執行；Claude 適合複雜架構規劃。"></div>
             </div>
             <select id="model-select">
-                <option value="mock">Mock Demo</option>
-                <option value="qwen3:14b">Qwen3 14B (Ollama)</option>
+                <option value="qwen3:14b" selected>Qwen3 14B (Ollama)</option>
                 <option value="llama3">Llama 3 (Ollama)</option>
                 <option value="gemma3">Gemma 3 (Ollama)</option>
                 <option value="qwen2.5">Qwen 2.5 (Ollama)</option>
+                <option value="mock">Mock Demo (UI流程測試，非真實回答)</option>
             </select>
         </div>
 
@@ -574,7 +881,7 @@
                     <div style="font-size:0.6em; color:#555;">SECURITY CLEARED</div>
                 </div>
             </div>
-            <span class="permission-badge">READ_ONLY</span>
+            <span class="permission-badge">MANAGED_AGENT</span>
             <div style="color:var(--primary); font-size:1.2em;">🔒</div>
 
             <div class="user-popup" id="user-popup" onclick="event.stopPropagation()">
@@ -594,34 +901,154 @@
     <div class="resizer" id="resizer"></div>
 
     <div class="main-content">
-        <div class="console-card">
+        <div class="console-card managed-dashboard">
             <div class="header-container">
                 <h3 class="en-title">TERMINAL</h3>
                 <span class="logo-zh" style="font-size:0.9em;">終端機</span>
-                <span class="permission-badge" id="permission-badge">MODE: READ_ONLY</span>
+                <span class="permission-badge" id="permission-badge">MODE: MANAGED_AGENT</span>
                 <div class="neon-dot"></div>
             </div>
-            <textarea id="task-input" rows="4" placeholder="Enter command..."></textarea>
-            <button class="btn-execute" onclick="sendTask()" data-i18n="run">啟動代理</button>
-            <div class="trace-shell">
-                <div class="trace-panel">
-                    <div class="trace-panel-header">
-                        <span>TRACE TIMELINE</span>
-                        <span>READ ONLY</span>
-                    </div>
-                    <div class="trace-timeline" id="trace-timeline">
-                        <div class="trace-empty">尚無 Runtime Trace</div>
+
+            <div class="command-bar">
+                <div class="command-stack">
+                    <textarea id="task-input" rows="2" placeholder="Enter command..."></textarea>
+                    <div class="command-status-row">
+                        <span class="status-chip">Mode: MANAGED_AGENT</span>
+                        <span class="status-chip risk" id="risk-chip">Risk: --</span>
+                        <span class="status-chip" id="approval-chip">Approval: --</span>
+                        <span class="status-chip" id="model-chip">Model: qwen3:14b</span>
                     </div>
                 </div>
-                <div class="tool-result-preview" id="tool-result-preview">
-                    <div class="tool-result-preview-title">
-                        <span>TOOL RESULT PREVIEW</span>
-                        <span>SAFE VIEW</span>
+                <button class="btn-execute" onclick="sendTask()" data-i18n="run">啟動代理</button>
+            </div>
+
+            <div class="managed-workspace">
+                <section class="reply-panel">
+                    <div class="panel-title-row">
+                        <span>HERMES REPLY / CONSOLE OUTPUT</span>
+                        <span class="panel-kicker">Reply First</span>
                     </div>
-                    <pre id="tool-result-preview-body" class="tool-result-empty">尚無工具結果</pre>
+                    <div class="log-terminal" id="terminal"></div>
+                </section>
+
+                <aside class="management-panel">
+                    <div class="panel-title-row">
+                        <span>MANAGEMENT CHAIN</span>
+                        <span class="panel-kicker">Decision Visible</span>
+                    </div>
+                    <div class="command-chain" id="command-chain">
+                        <div class="chain-line"></div>
+                        <div class="chain-node" id="node-l1">
+                            <div class="node-dot"></div>
+                            <div class="node-copy">
+                                <span class="node-role">L1 Executive</span>
+                                <span class="node-detail" id="node-l1-detail">Intent: waiting</span>
+                            </div>
+                        </div>
+                        <div class="chain-node" id="node-l2">
+                            <div class="node-dot"></div>
+                            <div class="node-copy">
+                                <span class="node-role">L2 Strategy</span>
+                                <span class="node-detail" id="node-l2-detail">Steps: waiting</span>
+                            </div>
+                        </div>
+                        <div class="chain-node" id="node-l3">
+                            <div class="node-dot"></div>
+                            <div class="node-copy">
+                                <span class="node-role">L3 Operator</span>
+                                <span class="node-detail" id="node-l3-detail">Tool calls: waiting</span>
+                            </div>
+                        </div>
+                        <div class="chain-node" id="node-l4">
+                            <div class="node-dot"></div>
+                            <div class="node-copy">
+                                <span class="node-role">L4 Auditor</span>
+                                <span class="node-detail" id="node-l4-detail">Verified: waiting</span>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+
+            <div class="detail-shell">
+                <div class="detail-tabs" id="detail-tabs">
+                    <button class="detail-tab active" type="button" data-tab="trace" onclick="switchDetailTab('trace')">Trace</button>
+                    <button class="detail-tab" type="button" data-tab="tool" onclick="switchDetailTab('tool')">Tool Result</button>
+                    <button class="detail-tab" type="button" data-tab="patch" onclick="switchDetailTab('patch')">Patch Review</button>
+                    <button class="detail-tab" type="button" data-tab="files" onclick="switchDetailTab('files')">Files</button>
+                    <button class="detail-tab" type="button" data-tab="mcp" onclick="switchDetailTab('mcp')">MCP</button>
+                    <button class="detail-tab" type="button" data-tab="shell" onclick="switchDetailTab('shell')">Shell</button>
+                    <button class="detail-tab" type="button" data-tab="logs" onclick="switchDetailTab('logs')">Logs</button>
+                </div>
+
+                <div class="detail-panel active" id="detail-trace">
+                    <div class="trace-panel">
+                        <div class="trace-panel-header">
+                            <span>TRACE TIMELINE</span>
+                            <span>READ ONLY</span>
+                        </div>
+                        <div class="trace-timeline" id="trace-timeline">
+                            <div class="trace-empty">尚無 Runtime Trace</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="detail-panel" id="detail-tool">
+                    <div class="tool-result-preview" id="tool-result-preview">
+                        <div class="tool-result-preview-title">
+                            <span>TOOL RESULT PREVIEW</span>
+                            <span>SAFE VIEW</span>
+                        </div>
+                        <pre id="tool-result-preview-body" class="tool-result-empty">尚無工具結果</pre>
+                    </div>
+                </div>
+
+                <div class="detail-panel" id="detail-patch">
+                    <div class="placeholder-panel">
+                        Patch Review 會在 Hermes 產生需要批准的修改時升級為焦點面板。一般任務保持收納，避免干擾主回覆。
+                    </div>
+                </div>
+
+                <div class="detail-panel" id="detail-files">
+                    <div class="placeholder-panel" id="files-preview">
+                        尚無產出檔案。建立專案或生成網站後，Hermes 會在工具結果中列出檔案路徑。
+                    </div>
+                </div>
+
+                <div class="detail-panel" id="detail-mcp">
+                    <pre class="placeholder-panel" id="mcp-preview">尚無 MCP 連線紀錄。啟用 hermes_mcp.json 後，這裡會顯示 MCP server、tool 與最近呼叫。</pre>
+                </div>
+
+                <div class="detail-panel" id="detail-shell">
+                    <div class="placeholder-panel" id="shell-approval-panel">
+                        尚無 Shell approval。當 Hermes 產生 shell proposal 時，這裡會顯示命令、風險與批准執行按鈕。
+                    </div>
+                </div>
+
+                <div class="detail-panel" id="detail-logs">
+                    <pre class="placeholder-panel" id="raw-log-preview">尚無原始紀錄</pre>
                 </div>
             </div>
-            <div class="log-terminal" id="terminal"></div>
+        </div>
+    </div>
+
+    <!-- Patch Review Overlay -->
+    <div class="patch-overlay" id="patch-overlay">
+        <div class="patch-modal">
+            <div class="patch-header">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span class="logo-en" style="font-size:1.2em;">PATCH REVIEW</span>
+                    <span id="patch-id-label" style="color:var(--text); font-size:0.8em;">ID: --</span>
+                </div>
+                <div class="permission-badge" id="patch-risk-badge">RISK: UNKNOWN</div>
+            </div>
+            <div class="patch-body" id="patch-diff-view">
+                <!-- Diff lines will be injected here -->
+            </div>
+            <div class="patch-footer">
+                <button class="btn-patch reject" onclick="closePatchReview()">REJECT</button>
+                <button class="btn-patch approve" id="approve-btn" onclick="executePatchApproval()">APPROVE & APPLY</button>
+            </div>
         </div>
     </div>
 
@@ -817,6 +1244,7 @@
             label.textContent = result.error ? '<< [HERMES_ERROR]' : '<< [HERMES_REPLY]';
 
             const body = document.createElement('div');
+            body.className = 'agent-reply-body';
             body.textContent = result.error || result.response || 'Hermes 沒有產生文字回覆。';
 
             row.appendChild(label);
@@ -923,13 +1351,235 @@
                 : '尚無工具結果';
         }
 
+        function switchDetailTab(tabName) {
+            document.querySelectorAll('.detail-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.tab === tabName);
+            });
+            document.querySelectorAll('.detail-panel').forEach(panel => {
+                panel.classList.toggle('active', panel.id === `detail-${tabName}`);
+            });
+        }
+
+        function getLatestLogByAction(logs, actionName) {
+            if (!logs) return null;
+            for (let i = logs.length - 1; i >= 0; i--) {
+                if (logs[i].action === actionName) return logs[i];
+            }
+            return null;
+        }
+
+        function summarizeToolResultForFiles(logs) {
+            const resultLogs = (logs || []).filter(log => getTraceEventKind(log.action, log.data) === 'tool-result');
+            const fileLines = [];
+            resultLogs.forEach(log => {
+                const content = formatTraceData(log.data?.tool_result || log.data?.result || log.data);
+                content.split('\n').forEach(line => {
+                    if (line.includes('Files:') || line.trim().startsWith('- ') || line.includes('index.html') || line.includes('styles.css')) {
+                        fileLines.push(line);
+                    }
+                });
+            });
+            return fileLines.slice(-12).join('\n');
+        }
+
+        function renderFilesPreview(logs) {
+            const filesPreview = document.getElementById('files-preview');
+            if (!filesPreview) return;
+            const summary = summarizeToolResultForFiles(logs);
+            filesPreview.textContent = summary || '尚無產出檔案。建立專案或生成網站後，Hermes 會在工具結果中列出檔案路徑。';
+        }
+
+        function renderRawLogPreview(logs) {
+            const rawLogPreview = document.getElementById('raw-log-preview');
+            if (!rawLogPreview) return;
+            rawLogPreview.textContent = logs && logs.length ? JSON.stringify(logs.slice(-20), null, 2) : '尚無原始紀錄';
+        }
+
+        function renderMcpPreview(logs) {
+            const mcpPreview = document.getElementById('mcp-preview');
+            if (!mcpPreview) return;
+            const mcpLogs = (logs || []).filter(log => String(log.action || '').startsWith('MCP_'));
+            if (!mcpLogs.length) {
+                mcpPreview.textContent = '尚無 MCP 連線紀錄。啟用 hermes_mcp.json 後，這裡會顯示 MCP server、tool 與最近呼叫。';
+                return;
+            }
+
+            const serverStates = [];
+            const tools = [];
+            const calls = [];
+            mcpLogs.forEach(log => {
+                const data = log.data || {};
+                if (['MCP_SERVER_READY', 'MCP_SERVER_FAILED', 'MCP_SERVER_DISABLED'].includes(log.action)) {
+                    serverStates.push(`${data.server || '--'}: ${log.action.replace('MCP_SERVER_', '').toLowerCase()}${data.error ? ` (${data.error})` : ''}`);
+                }
+                if (['MCP_TOOL_REGISTERED', 'MCP_TOOL_BLOCKED'].includes(log.action)) {
+                    tools.push(`mcp.${data.server || '--'}.${data.tool || '--'}  ${data.permission || '--'}  ${log.action === 'MCP_TOOL_BLOCKED' ? 'blocked' : 'enabled'}`);
+                }
+                if (['MCP_TOOL_CALL', 'MCP_TOOL_RESULT'].includes(log.action)) {
+                    calls.push(`${log.action}: mcp.${data.server || '--'}.${data.tool || '--'} ${data.ok === undefined ? '' : data.ok ? 'ok' : 'failed'}`);
+                }
+            });
+
+            mcpPreview.textContent = [
+                'Connected MCP Servers',
+                ...(serverStates.length ? serverStates : ['尚無 server 狀態']),
+                '',
+                'Imported MCP Tools',
+                ...(tools.length ? tools : ['尚無匯入工具']),
+                '',
+                'Recent MCP Calls',
+                ...(calls.length ? calls.slice(-8) : ['尚無 MCP 呼叫']),
+            ].join('\n');
+        }
+
+        async function renderShellApprovalPanel() {
+            const panel = document.getElementById('shell-approval-panel');
+            if (!panel) return;
+            try {
+                const resp = await fetch('/api/shell/pending');
+                const proposals = await resp.json();
+                if (!proposals.length) {
+                    panel.textContent = '尚無 Shell approval。當 Hermes 產生 shell proposal 時，這裡會顯示命令、風險與批准執行按鈕。';
+                    return;
+                }
+
+                panel.replaceChildren();
+                proposals.forEach(proposal => {
+                    const card = document.createElement('div');
+                    card.className = 'trace-event tool-call';
+
+                    const title = document.createElement('div');
+                    title.className = 'trace-event-meta';
+                    title.textContent = `${proposal.id} | ${proposal.risk || 'requires_user_approval'} | ${proposal.status}`;
+
+                    const body = document.createElement('pre');
+                    body.className = 'trace-event-body';
+                    body.textContent = `Command: ${proposal.command}\nCWD: ${proposal.cwd}\nReason: ${proposal.reason}`;
+
+                    const approve = document.createElement('button');
+                    approve.className = 'mini-action-btn';
+                    approve.type = 'button';
+                    approve.textContent = 'Approve & Execute';
+                    approve.onclick = () => approveAndExecuteShell(proposal.id);
+
+                    card.appendChild(title);
+                    card.appendChild(body);
+                    card.appendChild(approve);
+                    panel.appendChild(card);
+                });
+            } catch (e) {
+                panel.textContent = 'Shell approval 狀態讀取失敗。';
+            }
+        }
+
+        async function approveAndExecuteShell(proposalId) {
+            const approveResp = await fetch(`/api/shell/approve/${proposalId}`, { method: 'POST' });
+            if (!approveResp.ok) {
+                alert('Shell approval failed.');
+                return;
+            }
+            const approval = await approveResp.json();
+            const executeResp = await fetch('/api/shell/execute', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ proposal_id: proposalId, token: approval.token })
+            });
+            if (!executeResp.ok) {
+                const err = await executeResp.json();
+                alert(`Shell execution failed: ${err.detail || 'unknown error'}`);
+                return;
+            }
+            await renderShellApprovalPanel();
+            await updateLogs();
+        }
+
+        function updateManagementDetails(logs) {
+            const executive = getLatestLogByAction(logs, 'EXECUTIVE_DECISION')?.data || {};
+            const strategy = getLatestLogByAction(logs, 'STRATEGY_PLAN')?.data || {};
+            const auditor = getLatestLogByAction(logs, 'AUDITOR_VERIFICATION')?.data || {};
+            const operatorCalls = (logs || []).filter(log => log.action === 'OPERATOR_TOOL_CALL' || log.action === 'TOOL_CALL').length;
+            const operatorResults = (logs || []).filter(log => log.action === 'OPERATOR_TOOL_RESULT' || log.action === 'TOOL_RESULT').length;
+
+            const riskChip = document.getElementById('risk-chip');
+            const approvalChip = document.getElementById('approval-chip');
+            if (riskChip) riskChip.textContent = `Risk: ${executive.risk_level || '--'}`;
+            if (approvalChip) approvalChip.textContent = `Approval: ${executive.requires_user_approval ? 'Required' : executive.risk_level ? 'Not Required' : '--'}`;
+
+            const l1 = document.getElementById('node-l1-detail');
+            const l2 = document.getElementById('node-l2-detail');
+            const l3 = document.getElementById('node-l3-detail');
+            const l4 = document.getElementById('node-l4-detail');
+            if (l1) l1.textContent = `Intent: ${executive.intent || 'waiting'} | Risk: ${executive.risk_level || '--'}`;
+            if (l2) {
+                const steps = strategy.steps?.length || strategy.execution_steps?.length || 0;
+                l2.textContent = `Steps: ${steps || 'waiting'} | Plan: ${strategy.name || strategy.summary || '--'}`;
+            }
+            if (l3) l3.textContent = `Tool calls: ${operatorResults}/${operatorCalls || 0} | Status: ${operatorCalls ? 'running' : 'waiting'}`;
+            if (l4) l4.textContent = `Verified: ${auditor.verified ?? 'waiting'} | Failed criteria: ${(auditor.failed_criteria || []).length || 0}`;
+        }
+
+        function autoSelectDetailTab(logs) {
+            const activeTab = document.querySelector('.detail-tab.active')?.dataset.tab || 'trace';
+            if (activeTab !== 'trace') return;
+            const hasPatch = (logs || []).some(log => String(log.action || '').includes('PATCH'));
+            const hasCreatedFiles = Boolean(summarizeToolResultForFiles(logs));
+            if (hasPatch) switchDetailTab('patch');
+            else if (hasCreatedFiles) switchDetailTab('files');
+        }
+
         async function updateLogs() {
             try {
                 const resp = await fetch('/api/logs');
                 const logs = await resp.json();
                 renderTraceTimeline(logs);
                 renderToolResultPreview(logs);
+                renderFilesPreview(logs);
+                renderRawLogPreview(logs);
+                renderMcpPreview(logs);
+                await renderShellApprovalPanel();
+                updateCommandChain(logs);
+                updateManagementDetails(logs);
+                autoSelectDetailTab(logs);
             } catch (e) {}
+        }
+
+        function updateCommandChain(logs) {
+            const nodes = {
+                l1: document.getElementById('node-l1'),
+                l2: document.getElementById('node-l2'),
+                l3: document.getElementById('node-l3'),
+                l4: document.getElementById('node-l4')
+            };
+            
+            // Reset
+            Object.values(nodes).forEach(n => n.classList.remove('active', 'complete'));
+            
+            if (!logs || logs.length === 0) return;
+            
+            let hasExec = false;
+            let hasStrat = false;
+            let hasTool = false;
+            let hasAudit = false;
+            
+            logs.forEach(log => {
+                if (log.action === 'EXECUTIVE_DECISION') hasExec = true;
+                if (log.action === 'STRATEGY_PLAN') hasStrat = true;
+                if (log.action === 'OPERATOR_TOOL_CALL' || log.action === 'TOOL_CALL') hasTool = true;
+                if (log.action === 'AUDITOR_VERIFICATION') hasAudit = true;
+            });
+            
+            if (hasExec) nodes.l1.classList.add('complete');
+            if (hasStrat) nodes.l2.classList.add('complete');
+            if (hasTool) nodes.l3.classList.add('complete');
+            if (hasAudit) nodes.l4.classList.add('complete');
+            
+            // Set current active
+            const latest = logs[logs.length - 1]?.action;
+            if (latest === 'USER_CMD') nodes.l1.classList.add('active');
+            else if (latest === 'EXECUTIVE_DECISION') nodes.l2.classList.add('active');
+            else if (latest === 'STRATEGY_PLAN') nodes.l3.classList.add('active');
+            else if (latest === 'OPERATOR_TOOL_CALL' || latest === 'TOOL_CALL' || latest === 'OPERATOR_TOOL_RESULT') nodes.l3.classList.add('active');
+            else if (latest === 'AUDITOR_VERIFICATION') nodes.l4.classList.add('active');
         }
 
         async function sendTask() {
@@ -943,9 +1593,11 @@
             const baseUrl = document.getElementById('ollama-url').value.trim() || 'http://localhost:11434';
             const temperature = Number(document.getElementById('temp-val').innerText) || 0.7;
             const systemPrompt = document.getElementById('sys-prompt').value;
+            const modelChip = document.getElementById('model-chip');
             
             if(!task) return;
             
+            if (modelChip) modelChip.textContent = `Model: ${selectedModel === 'mock' ? 'Mock Demo (流程測試)' : selectedModel}`;
             btn.innerText = "EXECUTING...";
             btn.style.opacity = "0.5";
             appendUserCommand(terminal, task);
@@ -1033,6 +1685,80 @@
             }, 1000);
         }
 
+        // === Patch Review System ===
+        let currentPatchId = null;
+
+        async function checkForPendingPatches() {
+            if (document.getElementById('patch-overlay').style.display === 'flex') return;
+            try {
+                const resp = await fetch('/api/patch/pending');
+                const patches = await resp.json();
+                if (patches.length > 0) {
+                    showPatchReview(patches[0]);
+                }
+            } catch (e) {}
+        }
+
+        function showPatchReview(patch) {
+            currentPatchId = patch.id;
+            document.getElementById('patch-overlay').style.display = 'flex';
+            document.getElementById('patch-id-label').innerText = `ID: ${patch.id}`;
+            document.getElementById('patch-risk-badge').innerText = `RISK: ${patch.risk || 'LOW'}`;
+            
+            const diffView = document.getElementById('patch-diff-view');
+            diffView.innerHTML = '';
+            
+            const lines = patch.diff.split('\n');
+            lines.forEach(line => {
+                const div = document.createElement('div');
+                div.className = 'diff-line';
+                if (line.startsWith('+')) div.classList.add('diff-add');
+                else if (line.startsWith('-')) div.classList.add('diff-del');
+                else if (line.startsWith('@@') || line.startsWith('---') || line.startsWith('+++')) div.classList.add('diff-meta');
+                div.textContent = line;
+                diffView.appendChild(div);
+            });
+        }
+
+        function closePatchReview() {
+            document.getElementById('patch-overlay').style.display = 'none';
+            currentPatchId = null;
+        }
+
+        async function executePatchApproval() {
+            if (!currentPatchId) return;
+            const btn = document.getElementById('approve-btn');
+            btn.innerText = "AUTHORIZING...";
+            btn.disabled = true;
+
+            try {
+                // 1. Approve & Get Token
+                const appResp = await fetch(`/api/patch/approve/${currentPatchId}`, { method: 'POST' });
+                const { token } = await appResp.json();
+                
+                // 2. Apply with Token
+                const applyResp = await fetch('/api/patch/apply', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ patch_id: currentPatchId, token: token })
+                });
+                
+                if (applyResp.ok) {
+                    alert("Patch Applied Successfully!");
+                    closePatchReview();
+                    updateLogs();
+                } else {
+                    const err = await applyResp.json();
+                    alert("Apply Failed: " + err.detail);
+                }
+            } catch (e) {
+                alert("Approval Error: " + e.message);
+            } finally {
+                btn.innerText = "APPROVE & APPLY";
+                btn.disabled = false;
+            }
+        }
+
         const savedLang = localStorage.getItem('hermes_lang') || 'zh';
         document.getElementById('lang-select').value = savedLang;
         loadSystemPrompt();
@@ -1040,7 +1766,9 @@
         changeLang(savedLang);
         setInterval(updateDashboard, 5000);
         setInterval(updateLogs, 3000);
+        setInterval(checkForPendingPatches, 4000);
         updateLogs();
+        updateDashboard({ renderResult: true });
     </script>
 </body>
 </html>

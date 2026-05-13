@@ -9,7 +9,7 @@ class ConstraintValidator:
     def __init__(self, workspace_root: Optional[str] = None):
         # 優先順序: 手動指定 > 環境變數 > 當前目錄
         env_root = os.getenv("HERMES_WORKSPACE")
-        self.workspace_root = Path(env_root or workspace_root or ".").resolve()
+        self.workspace_root = Path(workspace_root or env_root or ".").resolve()
         
         # 允許的文字型副檔名
         self.allowed_extensions = {

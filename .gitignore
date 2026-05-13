@@ -38,11 +38,38 @@ Thumbs.db
 
 # Hermes Specific
 .env
+.env.*
 secrets.json
 *.log
+*.tmp
 hermes_metrics.json
+optimization/memory_semantic.json
+optimization/memory_semantic.json.*
+
+# Local model storage
+ollama/
+models/
+*.gguf
+*.safetensors
+*.bin
+
+# Runtime generated output
+hermes/artifacts/
+hermes/user_projects/
+artifacts/
+user_projects/
 
 # Reports & Analysis
 reports/
 analysis/
 .tempmediaStorage/
+
+# Test scratch workspaces
+tests/temp_workspace/
+tests/patch_test_workspace/
+tests/v2_test_workspace/
+tests/management_workspace/
+tests/memory_workspace/
+tests/mcp_config_workspace/
+tests/mcp_runtime_workspace/
+tests/mcp_local_workspace/
