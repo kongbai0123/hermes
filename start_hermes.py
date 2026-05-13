@@ -3,8 +3,10 @@ import socketserver
 import json
 import os
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 from hermes.core.runtime import HermesRuntime
 from hermes.core.llm_provider import MockLLMProvider, create_llm_provider
+from hermes.api.files import list_workspace_files, read_workspace_file, status_from_result
 
 PORT = int(os.getenv("HERMES_PORT", "8000"))
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -22,22 +24,28 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=DIRECTORY, **kwargs)
 
+    def _send_json(self, payload, status=200):
+        self.send_response(status)
+        self.send_header('Content-type', 'application/json; charset=utf-8')
+        self.end_headers()
+        self.wfile.write(json.dumps(payload, ensure_ascii=False).encode('utf-8'))
+
     def do_GET(self):
-        if self.path == "/api/status":
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json; charset=utf-8')
-            self.end_headers()
-            self.wfile.write(json.dumps(runtime.get_status(), ensure_ascii=False).encode('utf-8'))
-        elif self.path == "/api/logs":
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json; charset=utf-8')
-            self.end_headers()
-            traces = runtime.monitor.get_serializable_traces()
-            self.wfile.write(json.dumps(traces, ensure_ascii=False).encode('utf-8'))
-        elif self.path == "/api/shell/pending":
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json; charset=utf-8')
-            self.end_headers()
+        parsed = urlparse(self.path)
+        route = parsed.path
+        query = parse_qs(parsed.query)
+
+        if route == "/api/status":
+            self._send_json(runtime.get_status())
+        elif route == "/api/logs":
+            self._send_json(runtime.monitor.get_serializable_traces())
+        elif route == "/api/files/list":
+            result = list_workspace_files(runtime.constraints.workspace_root, query.get("path", ["."])[0])
+            self._send_json(result, status_from_result(result))
+        elif route == "/api/files/read":
+            result = read_workspace_file(runtime.constraints.workspace_root, query.get("path", [""])[0])
+            self._send_json(result, status_from_result(result))
+        elif route == "/api/shell/pending":
             actions = runtime.executor.shell_approval_manager.pending_actions
             data = [
                 {
@@ -52,17 +60,14 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
                 for proposal in actions.values()
                 if proposal.status == "pending"
             ]
-            self.wfile.write(json.dumps(data, ensure_ascii=False).encode('utf-8'))
-        elif self.path == "/api/governance":
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json; charset=utf-8')
-            self.end_headers()
+            self._send_json(data)
+        elif route == "/api/governance":
             data = {
                 "budget": runtime.governance.token_budget,
                 "consumed": runtime.governance.consumed_tokens,
                 "permissions": runtime.governance.permissions
             }
-            self.wfile.write(json.dumps(data, ensure_ascii=False).encode('utf-8'))
+            self._send_json(data)
         else:
             return super().do_GET()
 

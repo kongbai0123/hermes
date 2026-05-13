@@ -72,3 +72,4 @@ tests/memory_workspace/
 tests/mcp_config_workspace/
 tests/mcp_runtime_workspace/
 tests/mcp_local_workspace/
+tests/dashboard_files_workspace/

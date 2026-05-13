@@ -1,8 +1,10 @@
 from fastapi import FastAPI, HTTPException, Body
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 from hermes.core.runtime import HermesRuntime
 from hermes.core.llm_provider import MockLLMProvider, create_llm_provider # 預設使用 Mock 以利展示
+from hermes.api.files import list_workspace_files, read_workspace_file, status_from_result
 
 app = FastAPI(title="Hermes Agent OS API")
 
@@ -146,47 +148,13 @@ async def get_sessions():
 
 @app.get("/api/files/list")
 async def list_files(path: str = "."):
-    from pathlib import Path
-    ok, abs_path_str = runtime.constraints.validate_path(path)
-    if not ok:
-        raise HTTPException(status_code=403, detail=abs_path_str)
-    
-    p = Path(abs_path_str)
-    if not p.exists():
-         # 容錯：如果 path 是相對路徑但 validate_path 沒處理好，這裡做二次確認
-         p = (runtime.constraints.workspace_root / path).resolve()
-         
-    if not p.is_dir():
-        raise HTTPException(status_code=400, detail="Path is not a directory.")
-    
-    items = []
-    try:
-        # 獲取禁止訪問的清單
-        forbidden = runtime.constraints.forbidden_segments
-        
-        for item in p.iterdir():
-            # 安全過濾：禁止項目或隱藏項目 (除了 .gitignore)
-            if item.name in forbidden or (item.name.startswith('.') and item.name != '.gitignore'):
-                continue
-            
-            try:
-                rel_path = item.relative_to(runtime.constraints.workspace_root)
-            except ValueError:
-                continue # 不在 workspace 內則跳過
-                
-            items.append({
-                "name": item.name,
-                "path": str(rel_path).replace("\\", "/"),
-                "type": "directory" if item.is_dir() else "file",
-                "size": item.stat().st_size if item.is_file() else 0
-            })
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-        
-    # 按類型排序 (目錄優先) 然後按名稱
-    items.sort(key=lambda x: (x['type'] != 'directory', x['name'].lower()))
-    
-    return {"ok": True, "root": path, "items": items}
+    result = list_workspace_files(runtime.constraints.workspace_root, path)
+    return JSONResponse(result, status_code=status_from_result(result))
+
+@app.get("/api/files/read")
+async def read_file(path: str):
+    result = read_workspace_file(runtime.constraints.workspace_root, path)
+    return JSONResponse(result, status_code=status_from_result(result))
 
 if __name__ == "__main__":
     import uvicorn

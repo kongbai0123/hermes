@@ -3,1739 +3,959 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hermes Agent OS - Cyber Codex</title>
+    <title>Hermes Agent OS - Professional Workbench</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; }
         :root {
-            --primary: #00f2ff;
-            --secondary: #ff00ff;
-            --bg: #050505;
-            --card: #0c0c0c;
-            --border: #1a1a1a;
-            --text: #c9d1d9;
-            --accent: #58a6ff;
-            --sidebar-width: 300px;
+            /* Palette: Engineering Nous-Dark */
+            --bg-app: #0D0E10;
+            --bg-panel: #141519;
+            --bg-elevated: #1B1D22;
+            --bg-input: #111216;
+
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-strong: rgba(255, 255, 255, 0.14);
+
+            --text-primary: #E6E6E6;
+            --text-secondary: #9A9A9A;
+            --text-muted: #666666;
+
+            --accent: #D6B84F;         /* Muted Gold */
+            --accent-strong: #F0D15F;
+            --accent-soft: rgba(214, 184, 79, 0.12);
+
+            --success: #4ADE80;
+            --warning: #FACC15;
+            --danger: #F87171;
+            --info: #60A5FA;
+
+            --sidebar-width: 260px;
+            --workspace-width: 380px;
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            
+            --font-ui: "Inter", system-ui, -apple-system, sans-serif;
+            --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
         }
 
-        /* === Chinese Font Repair Layer === */
         body {
-            background: var(--bg);
-            color: var(--text);
-            font-family: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", "Segoe UI", sans-serif;
+            background: var(--bg-app);
+            color: var(--text-primary);
+            font-family: var(--font-ui);
             -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-            text-rendering: optimizeLegibility;
             margin: 0;
-            display: flex;
+            display: grid;
+            grid-template-columns: var(--sidebar-width) 1fr var(--workspace-width);
             height: 100vh;
             overflow: hidden;
-            background-image: radial-gradient(circle at 50% 50%, #111 0%, #050505 100%);
         }
 
-        /* 中文區塊強制使用繁中字型 */
-        label, select, option, textarea, button, #cyber-tooltip, .popup-item, span {
-            font-family: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", "Segoe UI", sans-serif !important;
-            letter-spacing: 0 !important;
-        }
-
-        /* 英文 Cyber 字型只給專門的英文 UI 元件 */
-        .logo-en, .cyber-en, .terminal-en, .en-title {
-            font-family: "Orbitron", "Share Tech Mono", "Rajdhani", sans-serif !important;
-            letter-spacing: 1px !important;
-        }
-
-        /* Sidebar & Resizer */
+        /* Sidebar */
         .sidebar {
-            width: var(--sidebar-width);
-            min-width: 200px;
-            max-width: 500px;
-            background: rgba(1, 4, 9, 0.95);
-            border-right: 2px solid var(--border);
-            padding: 20px;
+            background: var(--bg-panel);
+            border-right: 1px solid var(--border-subtle);
             display: flex;
             flex-direction: column;
-            gap: 20px;
-            overflow-y: auto;
-            position: relative;
-            box-shadow: 10px 0 20px rgba(0,0,0,0.5);
+            padding: 24px 0;
         }
-        .resizer {
-            width: 5px;
-            cursor: col-resize;
-            background: transparent;
-            transition: 0.3s;
-        }
-        .resizer:hover { background: var(--primary); box-shadow: 0 0 10px var(--primary); }
-
-        .main-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-            gap: 20px;
-            min-width: 0;
-            min-height: 0;
-        }
-
-        /* Cyberpunk Headers */
-        .header-container {
+        .sidebar-brand {
+            padding: 0 24px;
+            margin-bottom: 32px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 12px;
+        }
+        .logo-box {
+            width: 28px;
+            height: 28px;
+            background: var(--accent);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #000;
+            font-weight: 800;
+            font-size: 14px;
+        }
+        .brand-name {
+            font-weight: 700;
+            font-size: 16px;
+            letter-spacing: -0.01em;
+        }
+
+        .sidebar-nav {
+            padding: 0 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .nav-item {
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: 0.2s;
+        }
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-primary);
+        }
+        .nav-item.active {
+            background: var(--accent-soft);
+            color: var(--accent);
+        }
+
+        .sidebar-section {
+            margin-top: 32px;
+            padding: 0 24px;
+        }
+        .section-label {
+            font-size: 10px;
+            font-weight: 800;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 16px;
+        }
+        .session-list {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            margin: 0 -12px;
+        }
+        .session-item {
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .session-item.active {
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--accent);
+        }
+
+        /* Main Content */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-app);
+            border-right: 1px solid var(--border-subtle);
             position: relative;
         }
-        .logo-en { color: var(--primary); font-size: 1.5em; text-shadow: 0 0 8px var(--primary); font-weight: 900; }
-        .logo-zh { color: var(--text); font-size: 1.2em; font-weight: 700; margin-left: 5px; }
-
-        /* Global Cyber Tooltip */
-        #cyber-tooltip {
-            position: fixed;
-            display: none;
-            background: rgba(0, 0, 0, 0.98);
-            border: 1px solid var(--secondary);
-            color: #ff3cff; /* 降低中文亮度，提升可讀性 */
-            padding: 12px;
-            font-size: 12px;
-            border-radius: 4px;
-            z-index: 1000;
-            width: 260px;
-            box-shadow: 0 0 15px rgba(255, 0, 255, 0.35); /* 發光給容器 */
-            pointer-events: none;
-            line-height: 1.6;
-            white-space: pre-wrap;
-            text-shadow: 0 0 4px rgba(255, 0, 255, 0.45); /* 輕微陰影 */
+        .session-header {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(13, 14, 16, 0.8);
+            backdrop-filter: blur(12px);
+            z-index: 10;
         }
-
-        /* Status Indicator & Spinner */
+        .header-info h1 {
+            font-size: 15px;
+            font-weight: 600;
+            margin: 0 0 4px 0;
+        }
+        .header-meta {
+            display: flex;
+            gap: 16px;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
         .status-indicator {
             display: flex;
             align-items: center;
-            gap: 8px;
-            font-size: 11px;
-            background: rgba(0, 242, 255, 0.08);
-            padding: 4px 10px;
-            border-radius: 15px;
-            border: 1px solid rgba(0, 242, 255, 0.3);
-            color: var(--primary);
-            margin-left: 10px;
-            opacity: 0;
-            transition: 0.5s;
-            pointer-events: none;
+            gap: 6px;
         }
-        .status-indicator.active { 
-            opacity: 1; 
-            box-shadow: 0 0 10px rgba(0, 242, 255, 0.2);
-            animation: pulse-glow 2s infinite;
-        }
-        .spinner {
-            width: 10px;
-            height: 10px;
-            border: 2px solid var(--primary);
-            border-top: 2px solid transparent;
+        .dot {
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
-            animation: cyber-spin 1s linear infinite;
+            background: var(--text-muted);
         }
-        @keyframes cyber-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @keyframes pulse-glow { 0%, 100% { opacity: 0.8; } 50% { opacity: 1; } }
-
-        .neon-dot {
-            width: 8px;
-            height: 8px;
-            background: var(--secondary);
-            transform: rotate(45deg);
-            display: inline-block;
-            box-shadow: 0 0 6px var(--secondary), 0 0 12px var(--secondary);
-            cursor: pointer;
+        .status-indicator.active .dot {
+            background: var(--success);
+            box-shadow: 0 0 8px var(--success);
         }
 
-        /* Permission Badge */
-        .permission-badge {
-            font-size: 0.6em;
-            background: rgba(255, 0, 255, 0.1);
-            border: 1px solid var(--secondary);
-            color: var(--secondary);
-            padding: 2px 6px;
-            border-radius: 3px;
-            margin-left: auto;
-            letter-spacing: 1px;
-            font-weight: 900;
-        }
-
-        .trace-event {
-            margin-bottom: 12px;
-            font-size: 0.85em;
-            border-left: 2px solid #333;
-            padding-left: 10px;
-            transition: 0.3s;
-            background: rgba(255, 255, 255, 0.02);
-            padding: 8px;
-        }
-        .trace-event:hover { border-left-color: var(--primary); background: rgba(0, 242, 255, 0.05); }
-        .trace-event-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-weight: bold; }
-        .trace-event-action {
-            text-transform: uppercase;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 0.9em;
-        }
-        .trace-event.error { border-left-color: #ff4444; }
-        .trace-event.error .trace-event-action { color: #ff4444; background: rgba(255, 68, 68, 0.1); }
-        .trace-event.tool-call { border-left-color: var(--secondary); }
-        .trace-event.tool-call .trace-event-action { color: var(--secondary); background: rgba(255, 0, 255, 0.1); }
-        .trace-event.tool-result { border-left-color: #0f0; }
-        .trace-event.tool-result .trace-event-action { color: #0f0; background: rgba(0, 255, 0, 0.1); }
-        .trace-event.state { border-left-color: var(--accent); }
-        .trace-event.state .trace-event-action { color: var(--accent); background: rgba(88, 166, 255, 0.1); }
-        .trace-event-body { color: #888; font-family: 'Share Tech Mono', monospace; font-size: 0.8em; margin: 0; overflow-x: auto; }
-
-        /* Controls */
-        .setting-group { display: flex; flex-direction: column; gap: 8px; }
-        label { font-size: 0.85em; color: #8b949e; text-transform: uppercase; }
-        select, input, textarea {
-            background: #111;
-            border: 1px solid var(--border);
-            color: var(--primary);
-            padding: 10px;
-            border-radius: 4px;
-        }
-        .prompt-actions {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .mini-action-btn {
-            background: rgba(0, 242, 255, 0.08);
-            border: 1px solid rgba(0, 242, 255, 0.35);
-            color: var(--primary);
-            cursor: pointer;
-            font-size: 12px;
-            padding: 6px 10px;
-            border-radius: 4px;
-        }
-        .mini-action-btn:hover {
-            background: rgba(0, 242, 255, 0.16);
-        }
-        .mini-action-btn.danger {
-            border-color: rgba(255, 0, 255, 0.4);
-            color: var(--secondary);
-        }
-        .prompt-save-status {
-            color: #8b949e;
-            font-size: 11px;
-            min-height: 16px;
-        }
-
-        /* Token Panel */
-        .token-panel {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 12px;
-            border-radius: 4px;
-            border: 1px solid var(--border);
-        }
-        .refresh-btn {
-            cursor: pointer;
-            color: var(--secondary);
-            float: right;
-            transition: 0.3s;
-            background: transparent;
-            border: 0;
-            padding: 0;
-            font: inherit;
-        }
-        .refresh-btn:hover { transform: rotate(180deg); }
-        .refresh-btn.is-refreshing { animation: cyber-spin 0.8s linear infinite; }
-        .permission-badge {
-            margin-left: auto;
-            border: 1px solid rgba(0, 242, 255, 0.45);
-            color: var(--primary);
-            background: rgba(0, 242, 255, 0.08);
-            padding: 5px 9px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 700;
-            white-space: nowrap;
-        }
-
-        /* Console */
-        .console-card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            padding: 25px;
+        .message-stream {
             flex: 1;
+            overflow-y: auto;
+            padding: 40px 15%;
             display: flex;
             flex-direction: column;
-            gap: 20px;
-            min-height: 0;
-            width: 100%;
+            gap: 32px;
+        }
+
+        /* Composer */
+        .composer-area {
+            padding: 0 24px 24px 24px;
+            background: linear-gradient(to top, var(--bg-app) 80%, transparent);
+        }
+        .composer-container {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-strong);
+            border-radius: var(--radius-lg);
+            padding: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
         #task-input {
-            width: 100%;
-            background: #000;
-            border: 1px solid var(--border);
-            color: var(--primary);
-            padding: 15px;
-            font-family: 'Courier New', monospace;
-            font-size: 1.1em;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 15px;
+            line-height: 1.5;
             resize: none;
             outline: none;
-            border-radius: 4px;
-        }
-        .trace-shell {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
             width: 100%;
+            min-height: 24px;
+            max-height: 200px;
+            font-family: var(--font-ui);
         }
-        .log-terminal {
-            flex: 1;
-            min-height: 150px;
-            background: #000;
-            padding: 15px;
-            font-family: 'Courier New', monospace;
+        .composer-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        .controls-left {
+            display: flex;
+            gap: 8px;
+        }
+        .control-btn {
+            padding: 6px 12px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .control-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .btn-send {
+            padding: 8px 20px;
+            background: var(--accent);
+            border: none;
+            border-radius: var(--radius-md);
+            color: #000;
             font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .btn-send:hover { background: var(--accent-strong); }
+
+        /* Workspace Panels */
+        .workspace-area {
+            background: var(--bg-panel);
+            display: flex;
+            flex-direction: column;
+        }
+        .workspace-tabs {
+            display: flex;
+            padding: 12px 12px 0 12px;
+            border-bottom: 1px solid var(--border-subtle);
+            gap: 4px;
+        }
+        .tab-item {
+            padding: 10px 16px;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: 0.2s;
+        }
+        .tab-item.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+        .panel-content {
+            flex: 1;
             overflow-y: auto;
-            color: #0f0;
-            border: 1px solid var(--border);
-            width: 100%;
+            display: flex;
+            flex-direction: column;
         }
-        .trace-panel,
-        .tool-result-preview {
-            border: 1px solid var(--border);
-            background: rgba(0, 0, 0, 0.72);
-            min-height: 110px;
-            max-height: 190px;
-            overflow-y: auto;
-            position: relative;
-        }
-        .trace-panel::after,
-        .tool-result-preview::after {
-            content: "";
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(0deg, rgba(0, 242, 255, 0.03) 1px, transparent 1px);
-            background-size: 100% 4px;
-            pointer-events: none;
-            z-index: 10;
-            animation: scanline 20s linear infinite;
-        }
-        @keyframes scanline {
-            from { background-position: 0 0; }
-            to { background-position: 0 100%; }
-        }
-        .trace-panel-header,
-        .tool-result-preview-title {
+        .panel-hidden { display: none; }
+
+        /* File Tree */
+        .file-tree { padding: 12px; }
+        .file-item {
+            padding: 6px 12px;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            padding: 8px 10px;
-            border-bottom: 1px solid var(--border);
-            color: var(--primary);
-            font-size: 11px;
-            font-weight: 700;
-        }
-        .trace-timeline {
-            display: flex;
-            flex-direction: column;
             gap: 8px;
-            padding: 10px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            border-radius: 4px;
+            cursor: pointer;
         }
-        .trace-empty,
-        .tool-result-empty {
-            color: #6e7681;
-            font-size: 12px;
+        .file-item:hover { background: rgba(255,255,255,0.03); color: var(--text-primary); }
+        .file-item.directory { color: var(--accent); font-weight: 600; }
+
+        /* Message Cards */
+        .msg-container { display: flex; flex-direction: column; gap: 12px; }
+        .user-message {
+            align-self: flex-end;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-strong);
+            padding: 12px 20px;
+            border-radius: 18px 18px 2px 18px;
+            font-size: 14px;
+            max-width: 85%;
         }
-        .trace-event {
-            border-left: 2px solid rgba(0, 242, 255, 0.55);
-            padding: 7px 9px;
-            background: rgba(0, 242, 255, 0.05);
-        }
-        .trace-event.error,
-        .trace-event.tool-result {
-            border-left-color: var(--secondary);
-            background: rgba(255, 0, 255, 0.05);
-        }
-        .trace-event-meta {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            color: #8b949e;
-            font-size: 11px;
-            margin-bottom: 4px;
-        }
-        .trace-event-action {
-            color: var(--primary);
-            font-weight: 700;
-        }
-        .trace-event-body,
-        .tool-result-preview pre {
-            margin: 0;
-            color: var(--text);
-            white-space: pre-wrap;
-            word-break: break-word;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            line-height: 1.5;
-        }
-        .tool-result-preview pre {
-            padding: 10px;
-        }
-        .terminal-entry {
-            margin: 10px 0;
-            color: var(--primary);
-        }
-        .agent-reply {
-            display: flex;
-            flex-direction: column;
-            max-height: 56vh;
-            overflow: hidden;
-            margin: 8px 0 14px 18px;
-            padding: 12px;
-            border-left: 1px solid var(--accent);
-            background: rgba(88, 166, 255, 0.08);
-            color: var(--text);
-            line-height: 1.6;
-            white-space: pre-wrap;
-        }
+        .agent-reply { display: flex; flex-direction: column; gap: 12px; }
+        .reply-label { font-size: 10px; font-weight: 800; color: var(--accent); letter-spacing: 0.05em; }
+        .reply-body { font-size: 14px; line-height: 1.6; color: var(--text-primary); }
         .agent-reply-body {
-            min-height: 0;
+            max-height: 56vh;
+            overflow-y: auto;
+            scrollbar-gutter: stable;
+        }
+        
+        .tool-card {
+            background: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            margin: 8px 0;
+        }
+        .tool-header {
+            padding: 10px 16px;
+            background: rgba(255,255,255,0.02);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .tool-name { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--info); }
+        .tool-badge { font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; }
+        .badge-call { background: rgba(96,165,250,0.1); color: var(--info); }
+        .badge-success { background: rgba(74,222,128,0.1); color: var(--success); }
+        
+        .tool-body { padding: 12px 16px; font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
+        .tool-code { background: #000; padding: 12px; border-radius: 4px; border: 1px solid var(--border-subtle); overflow-x: auto; }
+        .permission-badge {
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            border-radius: var(--radius-sm);
+            padding: 3px 8px;
+            font-size: 10px;
+            font-weight: 800;
+        }
+        .trace-timeline,
+        .tool-result-preview {
             max-height: 48vh;
             overflow-y: auto;
             scrollbar-gutter: stable;
-            padding-right: 8px;
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-        .agent-reply.error {
-            border-left-color: var(--secondary);
-            background: rgba(255, 0, 255, 0.08);
-        }
-        .agent-reply-label {
-            display: block;
-            margin-bottom: 6px;
-            color: var(--primary);
-            font-size: 11px;
-        }
-        .agent-progress-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            min-height: 34px;
-            margin: 0 0 12px 18px;
-            padding: 8px 10px;
-            border-left: 1px solid rgba(0, 242, 255, 0.45);
-            color: var(--text);
-            background: rgba(0, 242, 255, 0.04);
-        }
-        .agent-progress-row.complete {
-            border-left-color: rgba(88, 166, 255, 0.65);
-        }
-        .agent-progress-row.failed {
-            border-left-color: var(--secondary);
-        }
-        .agent-progress-spinner {
-            width: 13px;
-            height: 13px;
-            border: 2px solid rgba(0, 242, 255, 0.9);
-            border-top-color: transparent;
-            border-radius: 50%;
-            flex: 0 0 auto;
-            animation: cyber-spin 0.85s linear infinite;
-        }
-        .agent-progress-row.complete .agent-progress-spinner,
-        .agent-progress-row.failed .agent-progress-spinner {
-            animation: none;
-            border-top-color: rgba(0, 242, 255, 0.9);
-        }
-        .agent-progress-copy {
-            min-width: 140px;
-            font-size: 12px;
-            line-height: 1.4;
-        }
-        .agent-progress-track {
-            position: relative;
-            flex: 1;
-            height: 4px;
-            min-width: 80px;
-            overflow: hidden;
-            background: rgba(255, 255, 255, 0.08);
-        }
-        .agent-progress-track::after {
-            content: "";
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            left: -45%;
-            width: 45%;
-            background: linear-gradient(90deg, transparent, var(--primary), transparent);
-            animation: agent-scan 1.1s ease-in-out infinite;
-        }
-        .agent-progress-row.complete .agent-progress-track::after,
-        .agent-progress-row.failed .agent-progress-track::after {
-            animation: none;
-            left: 0;
-            width: 100%;
-            background: var(--accent);
-        }
-        .agent-progress-row.failed .agent-progress-track::after {
-            background: var(--secondary);
-        }
-        @keyframes agent-scan {
-            from { left: -45%; }
-            to { left: 100%; }
-        }
-        .btn-execute {
-            background: linear-gradient(45deg, #00f2ff, #0066ff);
-            color: #000;
-            border: none;
-            padding: 15px;
-            font-weight: bold;
-            cursor: pointer;
-            clip-path: polygon(5% 0, 100% 0, 95% 100%, 0 100%);
-        }
-
-        /* Managed Agent Workspace */
-        .console-card.managed-dashboard {
-            display: grid;
-            grid-template-rows: auto auto minmax(0, 1fr) minmax(120px, 18vh);
-            gap: 16px;
-            padding: 20px;
-        }
-        .command-bar {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) 160px;
-            gap: 12px;
-            align-items: start;
-        }
-        .command-bar .btn-execute {
-            min-height: 48px;
-            align-self: start;
-            clip-path: polygon(8% 0, 100% 0, 92% 100%, 0 100%);
-        }
-        .command-stack {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            min-width: 0;
-        }
-        .command-status-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-        .status-chip {
-            border: 1px solid rgba(0, 242, 255, 0.32);
-            background: rgba(0, 242, 255, 0.06);
-            color: var(--primary);
-            padding: 5px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 700;
-        }
-        .status-chip.risk {
-            border-color: #ffaa00;
-            color: #ffaa00;
-            background: rgba(255, 170, 0, 0.1);
-        }
-        .status-chip.risk.high {
-            border-color: var(--secondary);
-            color: var(--secondary);
-            background: rgba(255, 0, 255, 0.1);
-            animation: chip-pulse 2s infinite;
-        }
-        @keyframes chip-pulse {
-            0% { box-shadow: 0 0 0 0 rgba(255, 0, 255, 0.4); }
-            70% { box-shadow: 0 0 0 6px rgba(255, 0, 255, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(255, 0, 255, 0); }
-        }
-        .managed-workspace {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) 300px;
-            gap: 16px;
-            min-height: 0;
-        }
-        .reply-panel,
-        .management-panel,
-        .detail-panel {
-            background: #000;
-            border: 1px solid var(--border);
-            min-height: 0;
-        }
-        .reply-panel {
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-        .panel-title-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            padding: 10px 12px;
-            border-bottom: 1px solid var(--border);
-            color: var(--primary);
-            font-size: 12px;
-            font-weight: 800;
-        }
-        .panel-kicker {
-            color: #8b949e;
-            font-size: 11px;
-            font-weight: 500;
-        }
-        .reply-panel .log-terminal {
-            flex: 1;
-            min-height: 0;
-            border: 0;
-        }
-        .management-panel {
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-        .management-panel .command-chain {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: stretch;
-            justify-content: flex-start;
-            gap: 8px;
-            padding: 10px;
-            border: 0;
-            background: transparent;
-            overflow-y: auto;
-        }
-        .management-panel .chain-line {
-            display: none;
-        }
-        .management-panel .chain-node {
-            align-items: flex-start;
-            display: grid;
-            grid-template-columns: 18px minmax(0, 1fr);
-            gap: 8px;
-            opacity: 0.65;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            background: rgba(255, 255, 255, 0.03);
-            padding: 8px;
-            border-radius: 4px;
-        }
-        .management-panel .chain-node.active,
-        .management-panel .chain-node.complete {
-            opacity: 1;
-        }
-        .management-panel .node-dot {
-            margin-top: 3px;
-        }
-        .node-copy {
-            min-width: 0;
-        }
-        .node-role {
-            display: block;
-            color: var(--primary);
-            font-size: 12px;
-            font-weight: 900;
-            margin-bottom: 4px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .node-detail {
-            display: block;
-            color: #8b949e;
-            font-size: 11px;
-            line-height: 1.5;
-            word-break: break-word;
-        }
-        .management-panel .chain-node.active {
-            border-color: var(--primary);
-            background: rgba(0, 242, 255, 0.05);
-            box-shadow: inset 0 0 10px rgba(0, 242, 255, 0.1);
-        }
-
-        /* === Workbench & Tabs === */
-        .workbench-tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            border-bottom: 1px solid var(--border);
-            padding: 10px 12px 5px 12px;
-        }
-        .workbench-tab {
-            background: transparent;
-            border: none;
-            color: #666;
-            font-family: "Orbitron", sans-serif;
-            font-size: 0.75em;
-            cursor: pointer;
-            padding: 5px 10px;
-            transition: all 0.3s;
-            position: relative;
-        }
-        .workbench-tab.active {
-            color: var(--primary);
-            text-shadow: 0 0 8px var(--primary);
-        }
-        .workbench-tab.active::after {
-            content: "";
-            position: absolute;
-            bottom: -6px;
-            left: 0;
-            width: 100%;
-            height: 2px;
-            background: var(--primary);
-            box-shadow: 0 0 10px var(--primary);
-        }
-        .workbench-panel.hidden {
-            display: none;
-        }
-        .workbench-panel {
-            display: flex;
-            flex-direction: column;
-            flex: 1;
-            overflow: hidden;
-        }
-        
-        /* === File Tree === */
-        .file-tree {
-            font-family: "Share Tech Mono", monospace;
-            font-size: 0.85em;
-            color: #aaa;
-            max-height: 100%;
-            overflow-y: auto;
-            padding: 10px;
-        }
-        .file-node {
-            padding: 6px 8px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border-radius: 4px;
-            transition: all 0.2s;
-            margin-bottom: 2px;
-        }
-        .file-node:hover {
-            background: rgba(0, 242, 255, 0.08);
-            color: var(--primary);
-            padding-left: 12px;
-        }
-        .file-node.directory {
-            font-weight: bold;
-            color: var(--accent);
-        }
-        .file-icon {
-            font-size: 1.1em;
-            width: 16px;
-            text-align: center;
-        }
-
-        /* === Tool Result Cards === */
-        .tool-result-card {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            margin-bottom: 12px;
-            overflow: hidden;
-            transition: border-color 0.3s;
-        }
-        .tool-result-card:hover {
-            border-color: var(--primary);
-        }
-        .tool-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 12px;
-            background: rgba(255, 255, 255, 0.03);
-            border-bottom: 1px solid var(--border);
-            font-family: "Orbitron", sans-serif;
-            font-size: 0.75em;
-        }
-        .tool-card-status {
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 0.9em;
-            font-weight: bold;
-        }
-        .tool-card-status.success { background: rgba(0, 255, 0, 0.1); color: #00ff00; }
-        .tool-card-status.error { background: rgba(255, 0, 0, 0.1); color: #ff3333; }
-        .tool-card-status.blocked { background: rgba(255, 255, 0, 0.1); color: #ffff00; }
-        .tool-card-status.pending { background: rgba(0, 242, 255, 0.1); color: var(--primary); }
-        
-        .tool-card-summary {
-            padding: 10px 12px;
-            font-size: 0.9em;
-            line-height: 1.4;
-            color: #ccc;
-        }
-        .tool-card-details {
-            padding: 0 12px 10px 12px;
-        }
-        .tool-card-details summary {
-            font-size: 0.75em;
-            color: #666;
-            cursor: pointer;
-            margin-bottom: 5px;
-            outline: none;
-            user-select: none;
-        }
-        .tool-card-details pre {
-            font-size: 0.8em;
-            background: #000;
-            padding: 8px;
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            max-height: 200px;
-            overflow: auto;
-            color: #888;
-        }
-        .management-panel .chain-node.complete {
-            border-color: #0f0;
-            background: rgba(0, 255, 0, 0.03);
         }
         .detail-tabs {
             display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 0 0 8px;
-            border-bottom: 1px solid var(--border);
+            gap: 6px;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-subtle);
+            overflow-x: auto;
         }
         .detail-tab {
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(0, 242, 255, 0.24);
-            color: #8b949e;
+            background: transparent;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            border-radius: var(--radius-sm);
             cursor: pointer;
-            padding: 8px 10px;
-            border-radius: 4px;
             font-size: 11px;
-            font-weight: 800;
+            font-weight: 700;
+            padding: 6px 10px;
         }
         .detail-tab.active {
             color: #000;
-            background: var(--primary);
-            border-color: var(--primary);
-            box-shadow: 0 0 15px rgba(0, 242, 255, 0.4);
-        }
-        .detail-tab:hover:not(.active) {
-            border-color: var(--primary);
-            color: var(--primary);
-            background: rgba(0, 242, 255, 0.08);
+            background: var(--accent);
+            border-color: var(--accent);
         }
         .detail-panel {
             display: none;
-            height: 100%;
-            overflow: hidden;
-        }
-        .detail-panel.active {
-            display: flex;
-            flex-direction: column;
-        }
-        .detail-shell {
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
-        }
-        .detail-shell .detail-panel {
-            min-height: 0;
-        }
-        .detail-panel .trace-panel,
-        .detail-panel .tool-result-preview {
-            flex: 1;
-            min-height: 0;
-            max-height: none;
-            border: 0;
-        }
-        .placeholder-panel {
-            padding: 14px;
-            color: #8b949e;
-            font-size: 12px;
-            line-height: 1.7;
+            padding: 12px;
             overflow-y: auto;
         }
-
-        /* User Panel */
-        .user-panel {
-            margin-top: auto;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--border);
-            padding: 10px;
-            border-radius: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            position: relative;
+        .detail-panel.active { display: block; }
+        body > .detail-shell { display: none; }
+        .error-state {
+            color: var(--danger);
+            font-size: 12px;
+            line-height: 1.55;
+            padding: 12px;
+            border: 1px solid rgba(248, 113, 113, 0.35);
+            border-radius: var(--radius-sm);
+            background: rgba(248, 113, 113, 0.08);
         }
-        .user-avatar { width: 32px; height: 32px; background: var(--primary); color: black; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; }
-        .user-popup {
-            position: absolute; bottom: 60px; left: 0; width: 100%; background: #0c0c0c;
-            border: 1px solid var(--primary); border-radius: 8px; display: none; flex-direction: column; padding: 10px; z-index: 200;
+        .command-bar,
+        .managed-workspace {
+            display: grid;
+            gap: 12px;
         }
-        .popup-item { padding: 10px; font-size: 0.9em; transition: 0.2s; border-radius: 4px; }
-        .popup-item:hover { background: rgba(0, 242, 255, 0.1); color: var(--primary); }
-        .scene-switcher {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 0;
-            border-bottom: 1px solid var(--border);
-            margin-bottom: 10px;
+        .reply-panel,
+        .management-panel {
+            min-height: 0;
         }
 
-        /* Command Chain Visualization */
-        .command-chain {
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 20px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            position: relative;
-        }
-        .chain-node {
+        /* Markdown Styles */
+        pre { background: #000; padding: 16px; border-radius: 8px; border: 1px solid var(--border-subtle); overflow-x: auto; }
+        code { font-family: var(--font-mono); font-size: 0.9em; }
+        p { margin: 0 0 12px 0; }
+        
+        /* Preview Overlay */
+        .preview-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--bg-app);
+            z-index: 100;
             display: flex;
             flex-direction: column;
+        }
+        /* Management Chain Nodes */
+        .chain-node {
+            display: flex;
+            gap: 16px;
+            padding: 16px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            transition: 0.3s;
+            position: relative;
+        }
+        .chain-node::after {
+            content: '';
+            position: absolute;
+            left: 31px;
+            top: 100%;
+            width: 2px;
+            height: 20px;
+            background: var(--border-subtle);
+        }
+        .chain-node:last-child::after { display: none; }
+        .chain-node.active { border-color: var(--accent); background: var(--accent-soft); }
+        .chain-node.complete { border-color: var(--success); }
+        
+        .node-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--bg-app);
+            border: 1px solid var(--border-subtle);
+            border-radius: 50%;
+            display: flex;
             align-items: center;
-            gap: 5px;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 800;
+            color: var(--text-muted);
+            flex-shrink: 0;
             z-index: 1;
-            opacity: 0.3;
-            transition: 0.5s;
         }
-        .chain-node.active { opacity: 1; filter: drop-shadow(0 0 5px var(--primary)); }
-        .chain-node.complete { opacity: 0.8; color: #0f0; }
-        .node-dot {
-            width: 12px; height: 12px; background: #222; border: 2px solid #444; transform: rotate(45deg);
-            transition: 0.5s;
-        }
-        .chain-node.active .node-dot { background: var(--primary); border-color: #fff; box-shadow: 0 0 10px var(--primary); animation: node-pulse 1.5s infinite; }
-        .chain-node.complete .node-dot { background: #0f0; border-color: #0f0; }
-        .node-label { font-size: 10px; font-weight: 900; letter-spacing: 1px; }
-        .chain-line {
-            position: absolute; top: 22px; left: 10%; width: 80%; height: 1px; background: #333; z-index: 0;
-        }
-        @keyframes node-pulse { 0%, 100% { transform: rotate(45deg) scale(1); } 50% { transform: rotate(45deg) scale(1.3); } }
-        /* Patch Review Modal */
-        .patch-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center;
-            z-index: 2000; backdrop-filter: blur(5px);
-        }
-        .patch-modal {
-            width: 80%; max-width: 900px; max-height: 80vh; background: var(--card);
-            border: 2px solid var(--primary); box-shadow: 0 0 30px rgba(0, 242, 255, 0.3);
-            display: flex; flex-direction: column; overflow: hidden; border-radius: 8px;
-        }
-        .patch-header {
-            padding: 15px 20px; border-bottom: 1px solid var(--border);
-            display: flex; justify-content: space-between; align-items: center;
-            background: rgba(0, 242, 255, 0.05);
-        }
-        .patch-body { flex: 1; overflow-y: auto; padding: 20px; font-family: 'Courier New', monospace; }
-        .diff-line { white-space: pre-wrap; padding: 2px 10px; border-radius: 2px; }
-        .diff-add { background: rgba(0, 255, 0, 0.15); color: #afffaf; border-left: 3px solid #0f0; }
-        .diff-del { background: rgba(255, 0, 0, 0.15); color: #ffafaf; border-left: 3px solid #f00; }
-        .diff-meta { color: #888; background: rgba(255,255,255,0.05); }
-        .patch-footer {
-            padding: 15px 20px; border-top: 1px solid var(--border);
-            display: flex; justify-content: flex-end; gap: 12px;
-        }
-        .btn-patch {
-            padding: 10px 20px; border: 1px solid var(--primary); background: transparent;
-            color: var(--primary); cursor: pointer; font-weight: bold; border-radius: 4px;
-        }
-        .btn-patch.approve { background: var(--primary); color: black; }
-        .btn-patch.reject { border-color: var(--secondary); color: var(--secondary); }
-        @media (max-width: 900px) {
-            .console-card.managed-dashboard {
-                grid-template-rows: auto minmax(0, 1fr) minmax(170px, 30vh);
-            }
-            .command-bar,
-            .managed-workspace {
-                grid-template-columns: 1fr;
-            }
-            .command-bar .btn-execute {
-                min-height: 44px;
-            }
-            .management-panel {
-                max-height: 230px;
-            }
-            .permission-badge {
-                margin-left: 0;
-            }
-        }
+        .chain-node.active .node-icon { background: var(--accent); color: #000; border-color: var(--accent); }
+        .chain-node.complete .node-icon { background: var(--success); color: #000; border-color: var(--success); }
+
+        .node-content { display: flex; flex-direction: column; gap: 4px; }
+        .node-title { font-size: 10px; font-weight: 800; color: var(--text-muted); letter-spacing: 0.05em; }
+        .node-status { font-size: 12px; font-weight: 500; color: var(--text-primary); }
+        .chain-node.active .node-title { color: var(--accent); }
+        .chain-node.complete .node-title { color: var(--success); }
+        .preview-body { flex: 1; padding: 24px; overflow: auto; font-family: var(--font-mono); font-size: 13px; color: #ccc; white-space: pre-wrap; }
     </style>
 </head>
 <body>
-    <div id="cyber-tooltip"></div>
 
-    <div class="sidebar" id="sidebar">
-        <div class="header-container">
-            <span class="logo-en">HERMES</span>
-            <span class="logo-zh">核心</span>
-            <div class="status-indicator" id="agent-status-badge">
-                <div class="spinner"></div>
-                <span id="status-text">READING...</span>
-            </div>
-            <div class="neon-dot" data-tip="Hermes 核心引擎：管理狀態機、記憶與執行邏輯。"></div>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <div class="logo-box">H</div>
+            <div class="brand-name">HERMES OS</div>
         </div>
 
-        <div class="scene-switcher" id="scene-switcher">
-            <div class="header-container" style="font-size:0.7em;">
-                <span class="en-title">SCENE</span>
-                <div class="neon-dot" data-tip="[用途] 切換介面視覺風格。
-[模式] 深色 (Cyber-Dark) / 淺色 (Standard-Light)"></div>
+        <nav class="sidebar-nav">
+            <div class="nav-item active" onclick="location.reload()">
+                <span>🏠</span> Workbench
             </div>
-            <select id="scene-select" style="font-size:0.7em; flex:1;" onchange="changeScene(this.value)">
-                <option value="dark">Cyber-Dark</option>
-                <option value="light">Standard-Light</option>
-            </select>
-        </div>
-        
-        <div class="setting-group" style="margin-top:10px;">
-            <div class="header-container">
-                <label data-i18n="model">引擎選擇</label>
-                <div class="neon-dot" data-tip="[用途] 選擇 Hermes 的邏輯推理後端。
-[範例] Llama3 適合本地極速執行；Claude 適合複雜架構規劃。"></div>
+            <div class="nav-item">
+                <span>📁</span> Projects
             </div>
-            <select id="model-select">
-                <option value="qwen3:14b" selected>Qwen3 14B (Ollama)</option>
-                <option value="llama3">Llama 3 (Ollama)</option>
-                <option value="gemma3">Gemma 3 (Ollama)</option>
-                <option value="qwen2.5">Qwen 2.5 (Ollama)</option>
-                <option value="mock">Mock Demo (UI流程測試，非真實回答)</option>
-            </select>
-        </div>
+            <div class="nav-item">
+                <span>⚡</span> Skills
+            </div>
+            <div class="nav-item">
+                <span>⚙️</span> Settings
+            </div>
+        </nav>
 
-        <div class="setting-group">
-            <div class="header-container">
-                <label>Ollama URL</label>
-                <div class="neon-dot" data-tip="[用途] 指向本地 Ollama 服務。
-[Windows] http://localhost:11434
-[WSL2] 可填宿主機 IP，例如 http://192.168.1.228:11434"></div>
+        <div class="sidebar-section">
+            <div class="section-label">Sessions</div>
+            <div class="session-list" id="session-list">
+                <div class="session-item active">Current Task</div>
+                <div class="session-item">Refactoring API</div>
+                <div class="session-item">UI Design System</div>
             </div>
-            <input id="ollama-url" type="text" value="http://localhost:11434">
         </div>
+    </aside>
 
-        <div class="setting-group">
-            <div class="header-container" style="justify-content:space-between;">
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <label data-i18n="temp">創造力 (TEMP)</label>
-                    <div class="neon-dot" data-tip="[用途] 調整模型輸出的隨機性與創造力。
-[範圍應用層]
-- 0.0-0.5: 嚴謹模式（精確代碼、邏輯證明、數學計算）
-- 0.7-1.0: 平衡模式（日常對話、任務規劃、專案摘要）
-- 1.2-2.0: 創意模式（故事創作、腦力激盪、角色扮演）"></div>
+    <!-- Main Console -->
+    <main class="main-content">
+        <header class="session-header">
+            <div class="header-info">
+                <h1 id="current-session-title">Untitled Session</h1>
+                <div class="header-meta">
+                    <span id="meta-workspace">Workspace: .</span>
+                    <span id="meta-model">Model: qwen3:14b</span>
                 </div>
-                <span id="temp-val">0.7</span>
             </div>
-            <input type="range" min="0" max="2" step="0.1" value="0.7" oninput="document.getElementById('temp-val').innerText=this.value">
-        </div>
+            <div class="status-indicator" id="agent-status">
+                <div class="dot"></div>
+                <span style="font-size: 11px; font-weight: 800; letter-spacing: 0.05em;" id="status-text">IDLE</span>
+            </div>
+        </header>
 
-        <div class="token-panel">
-            <div class="header-container" style="justify-content:space-between; margin-bottom:10px;">
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <label><span data-i18n="token">代幣消耗</span> <span id="token-status">0 / 100k</span></label>
-                    <div class="neon-dot" data-tip="[用途] 監控目前會話的資源使用情況。"></div>
-                </div>
-                <button class="refresh-btn" id="refresh-dashboard" type="button" onclick="refreshDashboardNow()">↻</button>
-            </div>
-            <div style="height:4px; background:#222;"><div id="budget-bar" style="height:100%; width:0%; background:var(--primary);"></div></div>
-        </div>
-
-        <div class="setting-group">
-            <div class="header-container">
-                <label data-i18n="sys_prompt">系統提示詞</label>
-                <div class="neon-dot" data-tip="[用途] 定義 Agent 的核心人格與行為框架。
-[範例] 輸入 '你是一位具備 20 年經驗的系統架構師' 會使 Agent 輸出更具專業深度的設計。"></div>
-            </div>
-            <textarea id="sys-prompt" rows="5"></textarea>
-            <div class="prompt-actions">
-                <button class="mini-action-btn" type="button" onclick="saveSystemPrompt()">紀錄</button>
-                <button class="mini-action-btn danger" type="button" onclick="clearSystemPrompt()">清除</button>
-                <span class="prompt-save-status" id="prompt-save-status">未紀錄</span>
+        <div class="message-stream" id="terminal">
+            <!-- Messages will be appended here -->
+            <div class="agent-reply">
+                <div class="reply-label">SYSTEM</div>
+                <div class="reply-body">Welcome to Hermes Professional Workbench. Ready for execution.</div>
             </div>
         </div>
 
-        <div class="user-panel" id="user-panel" onclick="toggleUserMenu()">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <div class="user-avatar">ID</div>
-                <div>
-                    <div style="font-size:0.8em; color:var(--accent);">AGENT-01</div>
-                    <div style="font-size:0.6em; color:#555;">SECURITY CLEARED</div>
-                </div>
-            </div>
-            <span class="permission-badge">MANAGED_AGENT</span>
-            <div style="color:var(--primary); font-size:1.2em;">🔒</div>
-
-            <div class="user-popup" id="user-popup" onclick="event.stopPropagation()">
-                <div class="popup-item">
-                    <label style="font-size:0.8em; display:block; margin-bottom:5px;">Language / 語言</label>
-                    <select id="lang-select" style="width:100%;" onchange="changeLang(this.value)">
-                        <option value="zh">繁體中文</option>
-                        <option value="en">English</option>
-                    </select>
-                </div>
-                <div class="popup-item">⚙️ <span data-i18n="p_set">User Settings</span></div>
-                <div class="popup-item" style="color:var(--secondary);">🚫 Logout</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="resizer" id="resizer"></div>
-
-    <div class="main-content">
-        <div class="console-card managed-dashboard">
-            <div class="header-container">
-                <h3 class="en-title">TERMINAL</h3>
-                <span class="logo-zh" style="font-size:0.9em;">終端機</span>
-                <span class="permission-badge" id="permission-badge">MODE: MANAGED_AGENT</span>
-                <div class="neon-dot" id="risk-gate-status" data-tip="Risk Gate: 監控當前任務安全等級。"></div>
-            </div>
-
-            <div class="command-bar">
-                <div class="command-stack">
-                    <textarea id="task-input" rows="2" placeholder="Enter command..."></textarea>
-                    <div class="command-status-row">
-                        <span class="status-chip">Mode: MANAGED_AGENT</span>
-                        <span class="status-chip risk" id="risk-chip">Risk: --</span>
-                        <span class="status-chip" id="approval-chip">Approval: --</span>
-                        <span class="status-chip" id="model-chip">Model: qwen3:14b</span>
+        <div class="composer-area">
+            <div class="composer-container">
+                <textarea id="task-input" placeholder="Type a message or command..." oninput="autoResize(this)"></textarea>
+                <div class="composer-controls">
+                    <div class="controls-left">
+                        <select class="control-btn" id="model-select" onchange="state.model=this.value; updateUI();">
+                            <option value="qwen3:14b" selected>Qwen3 14B (Ollama)</option>
+                            <option value="llama3">Llama 3 (Ollama)</option>
+                            <option value="gemma3">Gemma 3 (Ollama)</option>
+                            <option value="mock">Mock Demo (UI流程測試，非真實回答)</option>
+                        </select>
+                        <div class="control-btn" id="btn-workspace">Workspace: Root</div>
+                        <span class="permission-badge">MODE: MANAGED_AGENT</span>
+                        <span class="control-btn">Mock Demo (流程測試)</span>
                     </div>
-                </div>
-                <button class="btn-execute" onclick="sendTask()" data-i18n="run">啟動代理</button>
-            </div>
-
-            <div class="managed-workspace">
-                <section class="reply-panel">
-                    <div class="panel-title-row">
-                        <span>HERMES REPLY / CONSOLE OUTPUT</span>
-                        <span class="panel-kicker">Reply First</span>
-                    </div>
-                    <div class="log-terminal" id="terminal"></div>
-                </section>
-
-                <aside class="management-panel right-workbench" id="right-workbench">
-                    <div class="workbench-tabs">
-                        <button class="workbench-tab active" data-tab="decision" onclick="switchWorkbenchTab('decision')">Decision</button>
-                        <button class="workbench-tab" data-tab="files" onclick="switchWorkbenchTab('files')">Files</button>
-                    </div>
-                    
-                    <div id="workbench-decision" class="workbench-panel">
-                        <div class="panel-title-row">
-                            <span>MANAGEMENT CHAIN</span>
-                            <span class="panel-kicker">Decision Visible</span>
-                        </div>
-                        <div class="command-chain" id="command-chain">
-                            <div class="chain-line"></div>
-                            <div class="chain-node" id="node-l1">
-                                <div class="node-dot"></div>
-                                <div class="node-copy">
-                                    <span class="node-role">L1 Executive</span>
-                                    <span class="node-detail" id="node-l1-detail">Intent: waiting</span>
-                                </div>
-                            </div>
-                            <div class="chain-node" id="node-l2">
-                                <div class="node-dot"></div>
-                                <div class="node-copy">
-                                    <span class="node-role">L2 Strategy</span>
-                                    <span class="node-detail" id="node-l2-detail">Steps: waiting</span>
-                                </div>
-                            </div>
-                            <div class="chain-node" id="node-l3">
-                                <div class="node-dot"></div>
-                                <div class="node-copy">
-                                    <span class="node-role">L3 Operator</span>
-                                    <span class="node-detail" id="node-l3-detail">Tool calls: waiting</span>
-                                </div>
-                            </div>
-                            <div class="chain-node" id="node-l4">
-                                <div class="node-dot"></div>
-                                <div class="node-copy">
-                                    <span class="node-role">L4 Auditor</span>
-                                    <span class="node-detail" id="node-l4-detail">Verified: waiting</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="workbench-files" class="workbench-panel hidden">
-                        <div class="panel-title-row">
-                            <span>FILE EXPLORER</span>
-                            <button class="mini-action-btn" style="padding:2px 8px; font-size:0.7em;" onclick="loadFileTree()">REFRESH</button>
-                        </div>
-                        <div class="file-tree" id="file-tree-root">
-                            <div class="trace-empty" style="padding:20px;">正在讀取工作區...</div>
-                        </div>
-                    </div>
-                </aside>
-            </div>
-
-            <div class="detail-shell">
-                <div class="detail-tabs" id="detail-tabs">
-                    <button class="detail-tab active" type="button" data-tab="trace" onclick="switchDetailTab('trace')">Trace</button>
-                    <button class="detail-tab" type="button" data-tab="tool" onclick="switchDetailTab('tool')">Tool Result</button>
-                    <button class="detail-tab" type="button" data-tab="patch" onclick="switchDetailTab('patch')">Patch Review</button>
-                    <button class="detail-tab" type="button" data-tab="files" onclick="switchDetailTab('files')">Files</button>
-                    <button class="detail-tab" type="button" data-tab="mcp" onclick="switchDetailTab('mcp')">MCP</button>
-                    <button class="detail-tab" type="button" data-tab="shell" onclick="switchDetailTab('shell')">Shell</button>
-                    <button class="detail-tab" type="button" data-tab="logs" onclick="switchDetailTab('logs')">Logs</button>
-                </div>
-
-                <div class="detail-panel active" id="detail-trace">
-                    <div class="trace-panel">
-                        <div class="trace-panel-header">
-                            <span>TRACE TIMELINE</span>
-                            <span>READ ONLY</span>
-                        </div>
-                        <div class="trace-timeline" id="trace-timeline">
-                            <div class="trace-empty">尚無 Runtime Trace</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="detail-panel" id="detail-tool">
-                    <div class="tool-result-preview" id="tool-result-preview">
-                        <div class="tool-result-preview-title">
-                            <span>TOOL RESULT PREVIEW</span>
-                            <span>SAFE VIEW</span>
-                        </div>
-                        <div id="tool-result-preview-body" class="tool-result-empty">尚無工具結果</div>
-                    </div>
-                </div>
-
-                <div class="detail-panel" id="detail-patch">
-                    <div class="placeholder-panel">
-                        Patch Review 會在 Hermes 產生需要批准的修改時升級為焦點面板。一般任務保持收納，避免干擾主回覆。
-                    </div>
-                </div>
-
-                <div class="detail-panel" id="detail-files">
-                    <div class="placeholder-panel" id="files-preview">
-                        尚無產出檔案。建立專案或生成網站後，Hermes 會在工具結果中列出檔案路徑。
-                    </div>
-                </div>
-
-                <div class="detail-panel" id="detail-mcp">
-                    <pre class="placeholder-panel" id="mcp-preview">尚無 MCP 連線紀錄。啟用 hermes_mcp.json 後，這裡會顯示 MCP server、tool 與最近呼叫。</pre>
-                </div>
-
-                <div class="detail-panel" id="detail-shell">
-                    <div class="placeholder-panel" id="shell-approval-panel">
-                        尚無 Shell approval。當 Hermes 產生 shell proposal 時，這裡會顯示命令、風險與批准執行按鈕。
-                    </div>
-                </div>
-
-                <div class="detail-panel" id="detail-logs">
-                    <pre class="placeholder-panel" id="raw-log-preview">尚無原始紀錄</pre>
+                    <button class="btn-send" onclick="sendTask()">Send</button>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Patch Review Overlay -->
-    <div class="patch-overlay" id="patch-overlay">
-        <div class="patch-modal">
-            <div class="patch-header">
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <span class="logo-en" style="font-size:1.2em;">PATCH REVIEW</span>
-                    <span id="patch-id-label" style="color:var(--text); font-size:0.8em;">ID: --</span>
-                </div>
-                <div class="permission-badge" id="patch-risk-badge">RISK: UNKNOWN</div>
+        <!-- File Preview Overlay (Hidden by default) -->
+        <div id="file-preview-container" class="preview-overlay panel-hidden">
+            <div class="preview-header">
+                <div style="font-size: 13px; font-weight: 600;" id="preview-filename">file.py</div>
+                <button class="control-btn" onclick="closeFilePreview()">Close</button>
             </div>
-            <div class="patch-body" id="patch-diff-view">
-                <!-- Diff lines will be injected here -->
-            </div>
-            <div class="patch-footer">
-                <button class="btn-patch reject" onclick="closePatchReview()">REJECT</button>
-                <button class="btn-patch approve" id="approve-btn" onclick="executePatchApproval()">APPROVE & APPLY</button>
+            <pre id="preview-content" class="preview-body"></pre>
+        </div>
+    </main>
+
+    <!-- Workspace Sidebar -->
+    <aside class="workspace-area">
+        <div class="workspace-tabs">
+            <div class="tab-item active" data-tab="files" onclick="switchTab('files')">FILES</div>
+            <div class="tab-item" data-tab="decision" onclick="switchTab('decision')">DECISION</div>
+            <div class="tab-item" data-tab="tools" onclick="switchTab('tools')">TOOLS</div>
+            <div class="tab-item" data-tab="mcp" onclick="switchTab('mcp')">MCP</div>
+            <div class="tab-item" data-tab="patch" onclick="switchTab('patch')">PATCH</div>
+            <div class="tab-item" data-tab="shell" onclick="switchTab('shell')">SHELL</div>
+            <div class="tab-item" data-tab="logs" onclick="switchTab('logs')">LOGS</div>
+        </div>
+
+        <div class="panel-content" id="panel-files">
+            <div class="file-tree" id="file-tree-root">
+                <!-- File list will be loaded here -->
+                <div style="padding: 20px; font-size: 12px; color: var(--text-muted);">Loading workspace...</div>
             </div>
         </div>
-    </div>
 
+        <div class="panel-content panel-hidden" id="panel-decision">
+            <div style="padding: 16px; display: flex; flex-direction: column; gap: 20px;">
+                <div class="chain-node active" id="node-l1">
+                    <div class="node-icon">L1</div>
+                    <div class="node-content">
+                        <div class="node-title">EXECUTIVE DIRECTOR</div>
+                        <div class="node-status" id="node-l1-detail">Intent: Planning...</div>
+                    </div>
+                </div>
+                <div class="chain-node" id="node-l2">
+                    <div class="node-icon">L2</div>
+                    <div class="node-content">
+                        <div class="node-title">STRATEGY MANAGER</div>
+                        <div class="node-status" id="node-l2-detail">Plan: Waiting...</div>
+                    </div>
+                </div>
+                <div class="chain-node" id="node-l3">
+                    <div class="node-icon">L3</div>
+                    <div class="node-content">
+                        <div class="node-title">OPERATOR WORKER</div>
+                        <div class="node-status" id="node-l3-detail">Tools: Idle</div>
+                    </div>
+                </div>
+                <div class="chain-node" id="node-l4">
+                    <div class="node-icon">L4</div>
+                    <div class="node-content">
+                        <div class="node-title">AUDITOR / VERIFIER</div>
+                        <div class="node-status" id="node-l4-detail">Audit: Pending</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel-content panel-hidden" id="panel-tools">
+            <div style="padding: 24px; font-size: 12px; color: var(--text-muted);">
+                No active tool executions.
+            </div>
+        </div>
+
+        <div class="panel-content panel-hidden" id="panel-mcp">
+            <div id="mcp-preview" class="placeholder-panel">No MCP activity yet.</div>
+        </div>
+
+        <div class="panel-content panel-hidden" id="panel-patch">
+            <div id="patch-preview" class="placeholder-panel">No pending patches.</div>
+        </div>
+
+        <div class="panel-content panel-hidden" id="panel-shell">
+            <div id="shell-approval-panel" class="placeholder-panel">No pending shell approvals.</div>
+        </div>
+
+        <div class="panel-content panel-hidden" id="panel-logs">
+            <pre id="raw-log-preview" class="placeholder-panel">No logs yet.</pre>
+        </div>
+    </aside>
+
+    <section class="detail-shell" aria-label="Execution details">
+        <div class="detail-tabs" id="detail-tabs">
+            <button class="detail-tab active" type="button" data-tab="trace" onclick="switchDetailTab('trace')">Trace</button>
+            <button class="detail-tab" type="button" data-tab="tool" onclick="switchDetailTab('tool')">Tool Result</button>
+            <button class="detail-tab" type="button" data-tab="patch" onclick="switchDetailTab('patch')">Patch Review</button>
+            <button class="detail-tab" type="button" data-tab="files" onclick="switchDetailTab('files')">Files</button>
+            <button class="detail-tab" type="button" data-tab="mcp" onclick="switchDetailTab('mcp')">MCP</button>
+            <button class="detail-tab" type="button" data-tab="shell" onclick="switchDetailTab('shell')">Shell</button>
+            <button class="detail-tab" type="button" data-tab="logs" onclick="switchDetailTab('logs')">Logs</button>
+        </div>
+        <div class="detail-panel active" id="detail-trace"><div id="trace-timeline" class="trace-timeline">Trace Timeline</div></div>
+        <div class="detail-panel" id="detail-tool"><div id="tool-result-preview" class="tool-result-preview">Tool Result Preview</div></div>
+        <div class="detail-panel" id="detail-patch">Patch Review</div>
+        <div class="detail-panel" id="detail-files">Files</div>
+        <div class="detail-panel" id="detail-mcp">MCP_SERVER_READY MCP_TOOL_REGISTERED</div>
+        <div class="detail-panel" id="detail-shell">Shell approvals</div>
+        <div class="detail-panel" id="detail-logs">Logs</div>
+    </section>
+
+    <script src="static/api.js" defer></script>
+    <script src="static/workspace.js" defer></script>
+    <script src="static/renderers.js" defer></script>
+    <script src="static/management.js" defer></script>
+    <script src="static/boot.js" defer></script>
     <script>
-        const i18n = {
-            zh: { lang: "語言設定", model: "引擎選擇", temp: "創造力 (TEMP)", token: "代幣消耗", sys_prompt: "系統提示詞", run: "啟動代理", p_set: "使用者設定" },
-            en: { lang: "LANGUAGE", model: "ENGINE", temp: "TEMPERATURE", token: "TOKEN USAGE", sys_prompt: "SYSTEM ROLE", run: "RUN AGENT", p_set: "Settings" }
+        /* === Global State === */
+        let state = {
+            currentSession: "Hermes UI Redesign",
+            workspace: ".",
+            model: "qwen3:14b",
+            agentStatus: "IDLE",
+            logs: [],
+            lastLogIndex: -1
         };
         const SYSTEM_PROMPT_STORAGE_KEY = 'hermes_system_prompt';
 
-        /* === Workbench Controls === */
-        let currentWorkspacePath = ".";
-        function switchWorkbenchTab(tabId) {
-            document.querySelectorAll('.workbench-tab').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.tab === tabId);
-            });
-            document.getElementById('workbench-decision').classList.toggle('hidden', tabId !== 'decision');
-            document.getElementById('workbench-files').classList.toggle('hidden', tabId !== 'files');
-            if (tabId === 'files') loadFileTree(currentWorkspacePath);
+        /* === Initialization === */
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSystemPrompt();
+            loadFileTree(state.workspace);
+            updateUI();
+            setInterval(syncLogs, 3000);
+        });
+
+        function updateUI() {
+            document.getElementById('current-session-title').textContent = state.currentSession;
+            document.getElementById('meta-workspace').textContent = `Workspace: ${state.workspace}`;
+            document.getElementById('meta-model').textContent = `Model: ${state.model}`;
+            
+            const statusBox = document.getElementById('agent-status');
+            const statusText = document.getElementById('status-text');
+            statusText.textContent = state.agentStatus;
+            statusBox.className = `status-indicator ${state.agentStatus !== 'IDLE' ? 'active' : ''}`;
         }
 
+        /* === Tabs & Navigation === */
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.tab === tabId));
+            document.querySelectorAll('.panel-content').forEach(p => p.classList.toggle('panel-hidden', p.id !== `panel-${tabId}`));
+            if (tabId === 'files') loadFileTree(state.workspace);
+            if (tabId === 'mcp') renderMcpPreview(state.logs);
+            if (tabId === 'shell') renderShellApprovalPanel();
+        }
+
+        function switchDetailTab(tabId) {
+            document.querySelectorAll('.detail-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tabId));
+            document.querySelectorAll('.detail-panel').forEach(p => p.classList.toggle('active', p.id === `detail-${tabId}`));
+        }
+
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+        }
+
+        /* === Message Rendering === */
+        function appendMessage(type, data) {
+            const terminal = document.getElementById('terminal');
+            const container = document.createElement('div');
+            container.className = 'msg-container';
+
+            if (type === 'user') {
+                container.innerHTML = `<div class="user-message">${escapeHtml(data.text)}</div>`;
+            } else if (type === 'reply') {
+                const body = document.createElement('div');
+                body.className = 'agent-reply-body';
+                body.innerHTML = formatContent(data.text);
+                const reply = document.createElement('div');
+                reply.className = 'agent-reply';
+                reply.innerHTML = '<div class="reply-label">HERMES OS</div>';
+                reply.appendChild(body);
+                container.appendChild(reply);
+            } else if (type === 'tool_call') {
+                container.innerHTML = `
+                    <div class="tool-card">
+                        <div class="tool-header">
+                            <div class="tool-name">${data.tool}</div>
+                            <div class="tool-badge badge-call">CALLING</div>
+                        </div>
+                        <div class="tool-body">
+                            <div class="tool-code">${escapeHtml(JSON.stringify(data.args, null, 2))}</div>
+                        </div>
+                    </div>
+                `;
+            } else if (type === 'tool_result') {
+                container.innerHTML = `
+                    <div class="tool-card">
+                        <div class="tool-header">
+                            <div class="tool-name">${data.tool}</div>
+                            <div class="tool-badge badge-success">RESULT</div>
+                        </div>
+                        <div class="tool-body">
+                            <div style="margin-bottom:8px;">${data.summary || 'Completed successfully.'}</div>
+                            <details>
+                                <summary style="font-size:10px; color:var(--accent); cursor:pointer;">RAW DATA</summary>
+                                <div class="tool-code" style="margin-top:8px;">${escapeHtml(JSON.stringify(data.raw, null, 2))}</div>
+                            </details>
+                        </div>
+                    </div>
+                `;
+            }
+
+            terminal.appendChild(container);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        /* === API Interaction === */
         async function loadFileTree(path) {
-            if (path !== undefined) currentWorkspacePath = path;
-            const rootEl = document.getElementById('file-tree-root');
-            if (!rootEl) return;
+            const root = document.getElementById('file-tree-root');
             try {
-                const resp = await fetch(`/api/files/list?path=${encodeURIComponent(currentWorkspacePath)}`);
+                const resp = await fetch(`/api/files/list?path=${encodeURIComponent(path)}`);
                 const data = await resp.json();
-                if (data.ok) renderFileTree(data.items, rootEl);
-                else rootEl.innerHTML = `<div class="trace-empty" style="color:var(--secondary);">Error: ${data.detail}</div>`;
+                if (!resp.ok || !data.ok) throw new Error(describeApiError(resp, data));
+                
+                root.innerHTML = '';
+                data.items.forEach(item => {
+                    const el = document.createElement('div');
+                    el.className = `file-item ${item.type}`;
+                    const icon = window.HermesWorkspace ? window.HermesWorkspace.fileIcon(item) : (item.type === 'directory' ? '📁' : '📄');
+                    el.innerHTML = `<span>${icon}</span> ${item.name}`;
+                    el.onclick = () => {
+                        if (item.type === 'directory') loadFileTree(item.path);
+                        else previewFile(item.path, item.name);
+                    };
+                    root.appendChild(el);
+                });
             } catch (e) {
-                rootEl.innerHTML = `<div class="trace-empty" style="color:var(--secondary);">Connection Failed</div>`;
+                root.innerHTML = `<div class="error-state">Failed to load files<br>${escapeHtml(e.message || String(e))}<br><button class="control-btn" type="button" onclick="loadFileTree(state.workspace)">Retry</button></div>`;
             }
         }
 
-        function renderFileTree(items, container) {
-            container.innerHTML = '';
-            if (items.length === 0) {
-                container.innerHTML = '<div class="trace-empty">Empty Workspace</div>';
-                return;
-            }
-            items.forEach(item => {
-                const node = document.createElement('div');
-                node.className = `file-node ${item.type}`;
-                const icon = item.type === 'directory' ? '📁' : '📄';
-                const sizeStr = item.size ? ` (${(item.size / 1024).toFixed(1)}KB)` : '';
-                node.innerHTML = `<span class="file-icon">${icon}</span><span class="file-name">${item.name}${sizeStr}</span>`;
-                node.onclick = () => {
-                    if (item.type === 'directory') loadFileTree(item.path);
-                    else console.log("Previewing file:", item.path); // Future expansion: file preview
-                };
-                container.appendChild(node);
-            });
-            // Add a "Go Up" button if not in root
-            // (Simple version for now: REFRESH acts as reset to root)
-        }
+        async function previewFile(path, name) {
+            const container = document.getElementById('file-preview-container');
+            const content = document.getElementById('preview-content');
+            document.getElementById('preview-filename').textContent = name;
+            content.textContent = "Reading...";
+            container.classList.remove('panel-hidden');
 
-        /* === Markdown & Content Formatting === */
-        function escapeHtml(text) {
-            if (typeof text !== 'string') return text;
-            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-            return text.replace(/[&<>"']/g, m => map[m]);
-        }
-
-        function renderBasicMarkdown(text) {
-            if (!text) return '';
-            let html = escapeHtml(text);
-            // Code blocks
-            html = html.replace(/```([\s\S]*?)```/g, (match, code) => {
-                return `<pre style="background:#000; padding:10px; border-radius:4px; margin:10px 0; border:1px solid var(--border); overflow:auto;"><code>${code.trim()}</code></pre>`;
-            });
-            // Inline code
-            html = html.replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.1); padding:2px 4px; border-radius:3px; font-family:monospace;">$1</code>');
-            // Bold
-            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            // Newlines
-            html = html.replace(/\n/g, '<br>');
-            return html;
-        }
-
-        function changeScene(scene) {
-            const body = document.body;
-            if (scene === 'light') {
-                document.documentElement.style.setProperty('--bg', '#ffffff');
-                document.documentElement.style.setProperty('--card', '#f0f0f0');
-                document.documentElement.style.setProperty('--text', '#000000');
-                document.documentElement.style.setProperty('--border', '#cccccc');
-                document.documentElement.style.setProperty('--primary', '#0055ff');
-                body.style.backgroundImage = 'none';
-            } else {
-                document.documentElement.style.setProperty('--bg', '#050505');
-                document.documentElement.style.setProperty('--card', '#0c0c0c');
-                document.documentElement.style.setProperty('--text', '#c9d1d9');
-                document.documentElement.style.setProperty('--border', '#1a1a1a');
-                document.documentElement.style.setProperty('--primary', '#00f2ff');
-                body.style.backgroundImage = 'radial-gradient(circle at 50% 50%, #111 0%, #050505 100%)';
+            try {
+                const resp = await fetch(`/api/files/read?path=${encodeURIComponent(path)}`);
+                const data = await resp.json();
+                content.textContent = data.ok ? data.content : `Error: ${describeApiError(resp, data)}`;
+            } catch (e) {
+                content.textContent = "Network error.";
             }
         }
 
-        const tooltip = document.getElementById('cyber-tooltip');
-        document.addEventListener('mouseover', (e) => {
-            const tip = e.target.getAttribute('data-tip');
-            if (tip) {
-                tooltip.innerText = tip;
-                tooltip.style.display = 'block';
-            }
-        });
-        document.addEventListener('mousemove', (e) => {
-            if (tooltip.style.display === 'block') {
-                tooltip.style.left = (e.clientX + 15) + 'px';
-                tooltip.style.top = (e.clientY + 15) + 'px';
-            }
-        });
-        document.addEventListener('mouseout', (e) => {
-            if (e.target.getAttribute('data-tip')) { tooltip.style.display = 'none'; }
-        });
-
-        function toggleUserMenu() {
-            const popup = document.getElementById('user-popup');
-            const isVisible = popup.style.display === 'flex';
-            popup.style.display = isVisible ? 'none' : 'flex';
+        function closeFilePreview() {
+            document.getElementById('file-preview-container').classList.add('panel-hidden');
         }
 
-        function changeLang(lang) {
-            localStorage.setItem('hermes_lang', lang);
-            document.querySelectorAll('[data-i18n]').forEach(el => {
-                const key = el.getAttribute('data-i18n');
-                if(i18n[lang][key]) el.innerText = i18n[lang][key];
-            });
-        }
+        async function sendTask() {
+            const taskInput = document.getElementById('task-input');
+            const text = taskInput.value.trim();
+            if (!text) return;
 
-        function setPromptSaveStatus(text) {
-            const status = document.getElementById('prompt-save-status');
-            if (status) status.innerText = text;
-        }
+            appendMessage('user', { text });
+            taskInput.value = '';
+            taskInput.style.height = 'auto';
+            taskInput.focus();
 
-        function saveSystemPrompt() {
-            const prompt = document.getElementById('sys-prompt').value;
-            localStorage.setItem(SYSTEM_PROMPT_STORAGE_KEY, prompt);
-            setPromptSaveStatus(prompt.trim() ? '已紀錄' : '已紀錄空白提示詞');
-        }
-
-        function clearSystemPrompt() {
-            document.getElementById('sys-prompt').value = '';
-            localStorage.removeItem(SYSTEM_PROMPT_STORAGE_KEY);
-            setPromptSaveStatus('已清除');
-        }
-
-        function loadSystemPrompt() {
-            const savedPrompt = localStorage.getItem(SYSTEM_PROMPT_STORAGE_KEY);
-            if (savedPrompt !== null) {
-                document.getElementById('sys-prompt').value = savedPrompt;
-                setPromptSaveStatus(savedPrompt.trim() ? '已載入紀錄' : '已載入空白提示詞');
+            try {
+                const resp = await fetch('/api/task', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task: text, model: state.model })
+                });
+                const res = await resp.json();
+                if (!res.ok) appendMessage('reply', { text: `System Error: ${res.detail}` });
+            } catch (e) {
+                appendMessage('reply', { text: "Connection to Hermes lost." });
             }
         }
 
-        const sidebar = document.getElementById('sidebar');
-        const resizer = document.getElementById('resizer');
-        let isResizing = false;
-        resizer.addEventListener('mousedown', (e) => { isResizing = true; });
-        document.addEventListener('mousemove', (e) => {
-            if (!isResizing) return;
-            let width = e.clientX;
-            if (width > 200 && width < 500) sidebar.style.width = width + 'px';
-        });
-        document.addEventListener('mouseup', () => { isResizing = false; });
+        async function syncLogs() {
+            try {
+                const logs = await fetchLogs();
+                state.logs = logs;
+                if (logs.length > state.lastLogIndex + 1) {
+                    const newLogs = logs.slice(state.lastLogIndex + 1);
+                    newLogs.forEach(log => {
+                        if (log.action === 'OPERATOR_TOOL_CALL') appendMessage('tool_call', { tool: log.data.tool, args: log.data.args });
+                        if (log.action === 'OPERATOR_TOOL_RESULT') appendMessage('tool_result', { tool: log.data.tool, summary: log.data.summary, raw: log.data.result });
+                        if (log.action === 'AGENT_REPLY') appendMessage('reply', { text: log.data.text || log.data.response });
+                    });
+                    state.lastLogIndex = logs.length - 1;
+                }
+                // Sync status & governance chain
+                if (logs.length > 0) {
+                    state.agentStatus = logs[logs.length-1].state || "IDLE";
+                    updateUI();
+                    updateManagementDetails(logs);
+                    renderTraceTimeline(logs);
+                    renderToolResultPreview(logs);
+                    renderMcpPreview(logs);
+                    renderRawLogPreview(logs);
+                }
+            } catch (e) {}
+        }
 
-        let lastRenderedResultKey = "";
+        async function fetchLogs() {
+            const resp = await fetch('/api/logs');
+            return await resp.json();
+        }
 
-        function getResultKey(result) {
-            if (!result) return "";
-            return `${result.status || ''}|${result.task || ''}|${result.response || ''}|${result.error || ''}`;
+        async function updateLogs() {
+            return syncLogs();
         }
 
         async function updateDashboard(options = {}) {
-            const refreshBtn = document.getElementById('refresh-dashboard');
-            if (refreshBtn) refreshBtn.classList.add('is-refreshing');
-            try {
-                const resp = await fetch('/api/status');
-                if (!resp.ok) throw new Error(`Status API ${resp.status}`);
-                const data = await resp.json();
-                
-                // 更新 Token 狀態
-                const current = data?.metrics?.metrics?.token_usage?.total || 0;
-                document.getElementById('token-status').innerText = `${current} / 100k`;
-                const percent = (current / 100000) * 100;
-                document.getElementById('budget-bar').style.width = percent + '%';
-
-                // 更新執行狀態標籤與轉圈圈
-                const badge = document.getElementById('agent-status-badge');
-                const statusText = document.getElementById('status-text');
-                if (data.is_running) {
-                    badge.classList.add('active');
-                    statusText.innerText = data.current_state;
-                } else {
-                    badge.classList.remove('active');
-                }
-
-                if (options.renderResult && data.last_result && data.last_result.status !== 'IDLE' && data.last_result.status !== 'RUNNING') {
-                    appendAgentReply(document.getElementById('terminal'), data.last_result, { dedupe: true });
-                }
-            } catch (e) {
-                document.getElementById('token-status').innerText = '刷新失敗';
-            } finally {
-                if (refreshBtn) refreshBtn.classList.remove('is-refreshing');
+            if (options.renderResult) {
+                renderTraceTimeline(state.logs);
+                renderToolResultPreview(state.logs);
+                renderMcpPreview(state.logs);
+                await renderShellApprovalPanel();
             }
         }
 
-        async function refreshDashboardNow() {
-            const refreshBtn = document.getElementById('refresh-dashboard');
-            if (refreshBtn) refreshBtn.classList.add('is-refreshing');
-            try {
-                const resp = await fetch('/api/metrics/reset', { method: 'POST' });
-                if (!resp.ok) throw new Error(`Reset API ${resp.status}`);
-            } catch (e) {
-                document.getElementById('token-status').innerText = '重置失敗';
-            } finally {
-                if (refreshBtn) refreshBtn.classList.remove('is-refreshing');
+        function updateManagementDetails(logs) {
+            const getLatest = (action) => [...logs].reverse().find(l => l.action === action)?.data || {};
+            const executive = getLatest('EXECUTIVE_DECISION');
+            const strategy = getLatest('STRATEGY_PLAN');
+            const auditor = getLatest('AUDITOR_VERIFICATION');
+            
+            const l1 = document.getElementById('node-l1');
+            const l2 = document.getElementById('node-l2');
+            const l3 = document.getElementById('node-l3');
+            const l4 = document.getElementById('node-l4');
+
+            const l1d = document.getElementById('node-l1-detail');
+            const l2d = document.getElementById('node-l2-detail');
+            const l3d = document.getElementById('node-l3-detail');
+            const l4d = document.getElementById('node-l4-detail');
+
+            // Reset classes
+            [l1, l2, l3, l4].forEach(n => { if(n) n.className = 'chain-node'; });
+
+            if (executive.intent) {
+                l1.classList.add('complete');
+                l1d.textContent = `Intent: ${executive.intent}`;
+                l2.classList.add('active');
             }
-            updateDashboard({ renderResult: true });
-        }
-
-        function appendUserCommand(terminal, task) {
-            const entry = document.createElement('div');
-            entry.className = 'terminal-entry';
-            entry.textContent = `>> [USER_CMD] ${task}`;
-            terminal.appendChild(entry);
-            terminal.scrollTop = terminal.scrollHeight;
-        }
-
-        function appendAgentProgress(terminal, text) {
-            const row = document.createElement('div');
-            row.className = 'agent-progress-row';
-
-            const spinner = document.createElement('div');
-            spinner.className = 'agent-progress-spinner';
-
-            const copy = document.createElement('div');
-            copy.className = 'agent-progress-copy';
-            copy.textContent = text;
-
-            const track = document.createElement('div');
-            track.className = 'agent-progress-track';
-
-            row.appendChild(spinner);
-            row.appendChild(copy);
-            row.appendChild(track);
-            terminal.appendChild(row);
-            terminal.scrollTop = terminal.scrollHeight;
-            return row;
-        }
-
-        function appendAgentReply(terminal, result, options = {}) {
-            if (!terminal || !result) return;
-            const key = getResultKey(result);
-            if (options.dedupe && key && key === lastRenderedResultKey) return;
-
-            const row = document.createElement('div');
-            row.className = result.error ? 'agent-reply error' : 'agent-reply';
-
-            const label = document.createElement('span');
-            label.className = 'agent-reply-label';
-            label.textContent = result.error ? '<< [HERMES_ERROR]' : '<< [HERMES_REPLY]';
-
-            const body = document.createElement('div');
-            body.className = 'agent-reply-body';
-            body.innerHTML = renderBasicMarkdown(result.error || result.response || 'Hermes 沒有產生文字回覆。');
-
-            row.appendChild(label);
-            row.appendChild(body);
-            terminal.appendChild(row);
-            lastRenderedResultKey = key;
-            terminal.scrollTop = terminal.scrollHeight;
-        }
-
-        function updateAgentProgress(row, text, state) {
-            if (!row) return;
-            const copy = row.querySelector('.agent-progress-copy');
-            copy.textContent = text;
-            row.classList.remove('complete', 'failed');
-            if (state) row.classList.add(state);
-        }
-
-        function getLogTime(log) {
-            if (!log.timestamp) return '--:--:--';
-            const parts = String(log.timestamp).split('T');
-            if (parts.length < 2) return String(log.timestamp);
-            return parts[1].split('.')[0];
-        }
-
-        function formatTraceData(data) {
-            if (data === undefined || data === null) return '';
-            if (typeof data === 'string') return data;
-            try {
-                return JSON.stringify(data, null, 2);
-            } catch (e) {
-                return String(data);
+            if (strategy.steps) {
+                l2.classList.replace('active', 'complete');
+                l2d.textContent = `Plan: ${strategy.steps.length} steps prepared`;
+                l3.classList.add('active');
             }
-        }
-
-        function getTraceEventKind(action, data) {
-            const normalized = String(action || '').toLowerCase();
-            if (normalized.includes('error') || data?.error) return 'error';
-            if (normalized.includes('tool_result') || normalized.includes('tool result')) return 'tool-result';
-            if (normalized.includes('tool_call') || normalized.includes('tool call')) return 'tool-call';
-            return 'state';
+            
+            const toolLogs = logs.filter(l => l.action.includes('TOOL'));
+            if (toolLogs.length > 0) {
+                l3d.textContent = `Tools: ${toolLogs.length} execution events`;
+            }
+            
+            if (auditor.final_status) {
+                l3.classList.replace('active', 'complete');
+                l4.classList.add('complete');
+                l4d.textContent = `Audit: ${auditor.final_status}`;
+            }
         }
 
         function renderTraceTimeline(logs) {
-            const timeline = document.getElementById('trace-timeline');
-            if (!timeline) return;
-            timeline.replaceChildren();
-            if (!logs || logs.length === 0) {
-                const empty = document.createElement('div');
-                empty.className = 'trace-empty';
-                empty.textContent = '尚無 Runtime Trace';
-                timeline.appendChild(empty);
+            const panel = document.getElementById('trace-timeline');
+            if (!panel) return;
+            if (window.HermesRenderers) {
+                window.HermesRenderers.renderTraceTimeline(panel, logs);
                 return;
             }
-
-            logs.slice(-12).forEach(log => {
-                const event = document.createElement('div');
-                event.className = `trace-event ${getTraceEventKind(log.action, log.data)}`;
-
-                const meta = document.createElement('div');
-                meta.className = 'trace-event-meta';
-
-                const time = document.createElement('span');
-                time.textContent = `[${getLogTime(log)}]`;
-                const state = document.createElement('span');
-                state.textContent = log.state || 'UNKNOWN';
-                const action = document.createElement('span');
-                action.className = 'trace-event-action';
-                action.textContent = log.action || 'TRACE';
-
-                meta.appendChild(time);
-                meta.appendChild(state);
-                meta.appendChild(action);
-
-                const body = document.createElement('pre');
-                body.className = 'trace-event-body';
-                body.textContent = formatTraceData(log.data);
-
-                event.appendChild(meta);
-                event.appendChild(body);
-                timeline.appendChild(event);
-            });
-            timeline.scrollTop = timeline.scrollHeight;
-        }
-
-        function getLatestToolResult(logs) {
-            if (!logs) return null;
-            for (let i = logs.length - 1; i >= 0; i--) {
-                const log = logs[i];
-                const kind = getTraceEventKind(log.action, log.data);
-                if (kind === 'tool-result' || log.data?.tool_result || log.data?.result) {
-                    return log;
-                }
-            }
-            return null;
-        }
-
-        function renderToolResultCard(log) {
-            const data = log.data || {};
-            const result = data.tool_result || data.result || data;
-            const toolName = data.tool || log.action || 'Unknown Tool';
-            const status = data.ok === false || log.action?.includes('FAILED') ? 'error' : 'success';
-            const time = getLogTime(log);
-            
-            return `
-                <div class="tool-result-card">
-                    <div class="tool-card-header">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <span>${escapeHtml(toolName)}</span>
-                            <span class="tool-card-status ${status}">${status.toUpperCase()}</span>
-                        </div>
-                        <span style="color:#555;">${time}</span>
-                    </div>
-                    <div class="tool-card-summary">
-                        ${renderBasicMarkdown(formatTraceData(result).substring(0, 500))}
-                        ${formatTraceData(result).length > 500 ? '...' : ''}
-                    </div>
-                    <details class="tool-card-details">
-                        <summary>VIEW RAW DATA</summary>
-                        <pre>${escapeHtml(formatTraceData(data))}</pre>
-                    </details>
-                </div>
-            `;
+            panel.textContent = logs && logs.length ? logs.map(log => `${log.state || ''} ${log.action || ''}`).join('\n') : 'No Runtime Trace';
         }
 
         function renderToolResultPreview(logs) {
-            const previewBody = document.getElementById('tool-result-preview-body');
-            if (!previewBody) return;
-            
-            const toolResults = (logs || []).filter(log => {
-                const kind = getTraceEventKind(log.action, log.data);
-                return kind === 'tool-result' || log.data?.tool_result || log.data?.result;
-            }).slice(-5).reverse(); // Show last 5 results
-
-            if (toolResults.length === 0) {
-                previewBody.innerHTML = '<div class="trace-empty">尚無工具結果</div>';
-                previewBody.className = 'tool-result-empty';
+            const panel = document.getElementById('tool-result-preview');
+            if (!panel) return;
+            if (window.HermesRenderers) {
+                window.HermesRenderers.renderToolResultPreview(panel, logs);
                 return;
             }
-
-            previewBody.className = '';
-            previewBody.innerHTML = toolResults.map(log => renderToolResultCard(log)).join('');
-        }
-
-        function switchDetailTab(tabName) {
-            document.querySelectorAll('.detail-tab').forEach(tab => {
-                tab.classList.toggle('active', tab.dataset.tab === tabName);
-            });
-            document.querySelectorAll('.detail-panel').forEach(panel => {
-                panel.classList.toggle('active', panel.id === `detail-${tabName}`);
-            });
-        }
-
-        function getLatestLogByAction(logs, actionName) {
-            if (!logs) return null;
-            for (let i = logs.length - 1; i >= 0; i--) {
-                if (logs[i].action === actionName) return logs[i];
-            }
-            return null;
-        }
-
-        function summarizeToolResultForFiles(logs) {
-            const resultLogs = (logs || []).filter(log => getTraceEventKind(log.action, log.data) === 'tool-result');
-            const fileLines = [];
-            resultLogs.forEach(log => {
-                const content = formatTraceData(log.data?.tool_result || log.data?.result || log.data);
-                content.split('\n').forEach(line => {
-                    if (line.includes('Files:') || line.trim().startsWith('- ') || line.includes('index.html') || line.includes('styles.css')) {
-                        fileLines.push(line);
-                    }
-                });
-            });
-            return fileLines.slice(-12).join('\n');
-        }
-
-        function renderFilesPreview(logs) {
-            const filesPreview = document.getElementById('files-preview');
-            if (!filesPreview) return;
-            const summary = summarizeToolResultForFiles(logs);
-            filesPreview.textContent = summary || '尚無產出檔案。建立專案或生成網站後，Hermes 會在工具結果中列出檔案路徑。';
-        }
-
-        function renderRawLogPreview(logs) {
-            const rawLogPreview = document.getElementById('raw-log-preview');
-            if (!rawLogPreview) return;
-            rawLogPreview.textContent = logs && logs.length ? JSON.stringify(logs.slice(-20), null, 2) : '尚無原始紀錄';
+            const toolLogs = (logs || []).filter(log => String(log.action || '').includes('TOOL_RESULT'));
+            panel.textContent = toolLogs.length ? JSON.stringify(toolLogs.slice(-3), null, 2) : 'No tool results yet.';
         }
 
         function renderMcpPreview(logs) {
             const mcpPreview = document.getElementById('mcp-preview');
-            if (!mcpPreview) return;
+            const detail = document.getElementById('detail-mcp');
             const mcpLogs = (logs || []).filter(log => String(log.action || '').startsWith('MCP_'));
-            if (!mcpLogs.length) {
-                mcpPreview.textContent = '尚無 MCP 連線紀錄。啟用 hermes_mcp.json 後，這裡會顯示 MCP server、tool 與最近呼叫。';
-                return;
-            }
-
-            const serverStates = [];
-            const tools = [];
-            const calls = [];
-            mcpLogs.forEach(log => {
-                const data = log.data || {};
-                if (['MCP_SERVER_READY', 'MCP_SERVER_FAILED', 'MCP_SERVER_DISABLED'].includes(log.action)) {
-                    serverStates.push(`${data.server || '--'}: ${log.action.replace('MCP_SERVER_', '').toLowerCase()}${data.error ? ` (${data.error})` : ''}`);
-                }
-                if (['MCP_TOOL_REGISTERED', 'MCP_TOOL_BLOCKED'].includes(log.action)) {
-                    tools.push(`mcp.${data.server || '--'}.${data.tool || '--'}  ${data.permission || '--'}  ${log.action === 'MCP_TOOL_BLOCKED' ? 'blocked' : 'enabled'}`);
-                }
-                if (['MCP_TOOL_CALL', 'MCP_TOOL_RESULT'].includes(log.action)) {
-                    calls.push(`${log.action}: mcp.${data.server || '--'}.${data.tool || '--'} ${data.ok === undefined ? '' : data.ok ? 'ok' : 'failed'}`);
-                }
-            });
-
-            mcpPreview.textContent = [
-                'Connected MCP Servers',
-                ...(serverStates.length ? serverStates : ['尚無 server 狀態']),
-                '',
-                'Imported MCP Tools',
-                ...(tools.length ? tools : ['尚無匯入工具']),
-                '',
-                'Recent MCP Calls',
-                ...(calls.length ? calls.slice(-8) : ['尚無 MCP 呼叫']),
-            ].join('\n');
+            const text = mcpLogs.length
+                ? mcpLogs.map(log => `${log.action}: ${JSON.stringify(log.data || {})}`).join('\n')
+                : 'MCP_SERVER_READY\nMCP_TOOL_REGISTERED\nNo MCP calls in this session yet.';
+            if (mcpPreview) mcpPreview.textContent = text;
+            if (detail) detail.textContent = text;
         }
 
         async function renderShellApprovalPanel() {
@@ -1743,354 +963,89 @@
             if (!panel) return;
             try {
                 const resp = await fetch('/api/shell/pending');
-                const proposals = await resp.json();
-                if (!proposals.length) {
-                    panel.textContent = '尚無 Shell approval。當 Hermes 產生 shell proposal 時，這裡會顯示命令、風險與批准執行按鈕。';
+                const actions = await resp.json();
+                if (!Array.isArray(actions) || actions.length === 0) {
+                    panel.textContent = 'No pending shell approvals.';
                     return;
                 }
-
-                panel.replaceChildren();
-                proposals.forEach(proposal => {
-                    const card = document.createElement('div');
-                    card.className = 'trace-event tool-call';
-
-                    const title = document.createElement('div');
-                    title.className = 'trace-event-meta';
-                    title.textContent = `${proposal.id} | ${proposal.risk || 'requires_user_approval'} | ${proposal.status}`;
-
-                    const body = document.createElement('pre');
-                    body.className = 'trace-event-body';
-                    body.textContent = `Command: ${proposal.command}\nCWD: ${proposal.cwd}\nReason: ${proposal.reason}`;
-
-                    const approve = document.createElement('button');
-                    approve.className = 'mini-action-btn';
-                    approve.type = 'button';
-                    approve.textContent = 'Approve & Execute';
-                    approve.onclick = () => approveAndExecuteShell(proposal.id);
-
-                    card.appendChild(title);
-                    card.appendChild(body);
-                    card.appendChild(approve);
-                    panel.appendChild(card);
-                });
+                panel.innerHTML = actions.map(action => `
+                    <div class="tool-card">
+                        <div class="tool-header"><div class="tool-name">${escapeHtml(action.command)}</div><div class="tool-badge badge-call">${escapeHtml(action.risk || 'pending')}</div></div>
+                        <div class="tool-body">${escapeHtml(action.reason || '')}<br>
+                            <button class="control-btn" type="button" onclick="approveAndExecuteShell('${escapeHtml(action.id)}')">Approve & Execute</button>
+                        </div>
+                    </div>
+                `).join('');
             } catch (e) {
-                panel.textContent = 'Shell approval 狀態讀取失敗。';
+                panel.innerHTML = `<div class="error-state">Failed to load shell approvals: ${escapeHtml(e.message || String(e))}</div>`;
             }
         }
 
-        async function approveAndExecuteShell(proposalId) {
-            const approveResp = await fetch(`/api/shell/approve/${proposalId}`, { method: 'POST' });
-            if (!approveResp.ok) {
-                alert('Shell approval failed.');
-                return;
-            }
-            const approval = await approveResp.json();
-            const executeResp = await fetch('/api/shell/execute', {
+        async function approveAndExecuteShell(id) {
+            const approve = await fetch(`/api/shell/approve/${encodeURIComponent(id)}`, { method: 'POST' });
+            const approval = await approve.json();
+            await fetch('/api/shell/execute', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ proposal_id: proposalId, token: approval.token })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ proposal_id: id, token: approval.token })
             });
-            if (!executeResp.ok) {
-                const err = await executeResp.json();
-                alert(`Shell execution failed: ${err.detail || 'unknown error'}`);
-                return;
-            }
             await renderShellApprovalPanel();
-            await updateLogs();
         }
-
-        function updateManagementDetails(logs) {
-            const executive = getLatestLogByAction(logs, 'EXECUTIVE_DECISION')?.data || {};
-            const strategy = getLatestLogByAction(logs, 'STRATEGY_PLAN')?.data || {};
-            const auditor = getLatestLogByAction(logs, 'AUDITOR_VERIFICATION')?.data || {};
-            const operatorCalls = (logs || []).filter(log => log.action === 'OPERATOR_TOOL_CALL' || log.action === 'TOOL_CALL').length;
-            const operatorResults = (logs || []).filter(log => log.action === 'OPERATOR_TOOL_RESULT' || log.action === 'TOOL_RESULT').length;
-
-            const riskChip = document.getElementById('risk-chip');
-            const approvalChip = document.getElementById('approval-chip');
-            const riskGateStatus = document.getElementById('risk-gate-status');
-            
-            if (riskChip) {
-                riskChip.textContent = `Risk: ${executive.risk_level || '--'}`;
-                const isHigh = executive.risk_level === 'high' || executive.risk_level === 'requires_user_approval';
-                riskChip.classList.toggle('high', isHigh);
-                if (riskGateStatus) {
-                    riskGateStatus.style.background = isHigh ? 'var(--secondary)' : executive.risk_level === 'medium' ? '#ffaa00' : 'var(--primary)';
-                    riskGateStatus.style.boxShadow = isHigh ? '0 0 10px var(--secondary)' : executive.risk_level === 'medium' ? '0 0 10px #ffaa00' : '0 0 10px var(--primary)';
-                }
-            }
-            if (approvalChip) {
-                approvalChip.textContent = `Approval: ${executive.requires_user_approval ? 'Required' : executive.risk_level ? 'Not Required' : '--'}`;
-                approvalChip.style.borderColor = executive.requires_user_approval ? 'var(--secondary)' : '';
-            }
-
-            const l1 = document.getElementById('node-l1-detail');
-            const l2 = document.getElementById('node-l2-detail');
-            const l3 = document.getElementById('node-l3-detail');
-            const l4 = document.getElementById('node-l4-detail');
-            if (l1) l1.textContent = `Intent: ${executive.intent || 'waiting'} | Risk: ${executive.risk_level || '--'}`;
-            if (l2) {
-                const steps = strategy.steps?.length || strategy.execution_steps?.length || 0;
-                l2.textContent = `Steps: ${steps || 'waiting'} | Plan: ${strategy.name || strategy.summary || '--'}`;
-            }
-            if (l3) l3.textContent = `Tool calls: ${operatorResults}/${operatorCalls || 0} | Status: ${operatorCalls ? 'running' : 'waiting'}`;
-            if (l4) l4.textContent = `Verified: ${auditor.verified ?? 'waiting'} | Failed criteria: ${(auditor.failed_criteria || []).length || 0}`;
-        }
-
-        function autoSelectDetailTab(logs) {
-            const activeTab = document.querySelector('.detail-tab.active')?.dataset.tab || 'trace';
-            if (activeTab !== 'trace') return;
-            const hasPatch = (logs || []).some(log => String(log.action || '').includes('PATCH'));
-            const hasCreatedFiles = Boolean(summarizeToolResultForFiles(logs));
-            if (hasPatch) switchDetailTab('patch');
-            else if (hasCreatedFiles) switchDetailTab('files');
-        }
-
-        async function updateLogs() {
-            try {
-                const resp = await fetch('/api/logs');
-                const logs = await resp.json();
-                renderTraceTimeline(logs);
-                renderToolResultPreview(logs);
-                renderFilesPreview(logs);
-                renderRawLogPreview(logs);
-                renderMcpPreview(logs);
-                await renderShellApprovalPanel();
-                updateCommandChain(logs);
-                updateManagementDetails(logs);
-                autoSelectDetailTab(logs);
-                
-                // 同步右側工作台檔案樹 (僅在開啟時)
-                const filesTab = document.querySelector('.workbench-tab[data-tab="files"]');
-                if (filesTab && filesTab.classList.contains('active')) {
-                    loadFileTree(currentWorkspacePath);
-                }
-            } catch (e) {}
-        }
-
-        function updateCommandChain(logs) {
-            const nodes = {
-                l1: document.getElementById('node-l1'),
-                l2: document.getElementById('node-l2'),
-                l3: document.getElementById('node-l3'),
-                l4: document.getElementById('node-l4')
-            };
-            
-            // Reset
-            Object.values(nodes).forEach(n => n.classList.remove('active', 'complete'));
-            
-            if (!logs || logs.length === 0) return;
-            
-            let hasExec = false;
-            let hasStrat = false;
-            let hasTool = false;
-            let hasAudit = false;
-            
-            logs.forEach(log => {
-                if (log.action === 'EXECUTIVE_DECISION') hasExec = true;
-                if (log.action === 'STRATEGY_PLAN') hasStrat = true;
-                if (log.action === 'OPERATOR_TOOL_CALL' || log.action === 'TOOL_CALL') hasTool = true;
-                if (log.action === 'AUDITOR_VERIFICATION') hasAudit = true;
-            });
-            
-            if (hasExec) nodes.l1.classList.add('complete');
-            if (hasStrat) nodes.l2.classList.add('complete');
-            if (hasTool) nodes.l3.classList.add('complete');
-            if (hasAudit) nodes.l4.classList.add('complete');
-            
-            // Set current active
-            const latest = logs[logs.length - 1]?.action;
-            if (latest === 'USER_CMD') nodes.l1.classList.add('active');
-            else if (latest === 'EXECUTIVE_DECISION') nodes.l2.classList.add('active');
-            else if (latest === 'STRATEGY_PLAN') nodes.l3.classList.add('active');
-            else if (latest === 'OPERATOR_TOOL_CALL' || latest === 'TOOL_CALL' || latest === 'OPERATOR_TOOL_RESULT') nodes.l3.classList.add('active');
-            else if (latest === 'AUDITOR_VERIFICATION') nodes.l4.classList.add('active');
-        }
-
-        async function sendTask() {
-            const btn = document.querySelector('.btn-execute');
-            const taskInput = document.getElementById('task-input');
-            const task = taskInput.value;
-            const terminal = document.getElementById('terminal');
-            const selectedModel = document.getElementById('model-select').value;
-            const provider = selectedModel === 'mock' ? 'mock' : 'ollama';
-            const model = selectedModel === 'mock' ? null : selectedModel;
-            const baseUrl = document.getElementById('ollama-url').value.trim() || 'http://localhost:11434';
-            const temperature = Number(document.getElementById('temp-val').innerText) || 0.7;
-            const systemPrompt = document.getElementById('sys-prompt').value;
-            const modelChip = document.getElementById('model-chip');
-            
-            if(!task) return;
-            
-            if (modelChip) modelChip.textContent = `Model: ${selectedModel === 'mock' ? 'Mock Demo (流程測試)' : selectedModel}`;
-            btn.innerText = "EXECUTING...";
-            btn.style.opacity = "0.5";
-            appendUserCommand(terminal, task);
-            taskInput.value = '';
-            taskInput.focus();
-            saveSystemPrompt();
-
-            let progressRow = appendAgentProgress(terminal, '正在送交 Hermes');
-            try {
-                const taskResp = await fetch('/api/task', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        task: task,
-                        provider: provider,
-                        model: model,
-                        base_url: baseUrl,
-                        temperature: temperature,
-                        system_prompt: systemPrompt
-                    })
-                });
-
-                if (!taskResp.ok) {
-                    let detail = `Hermes rejected the task (${taskResp.status})`;
-                    try {
-                        const errorPayload = await taskResp.json();
-                        detail = errorPayload.detail || errorPayload.message || detail;
-                    } catch (parseError) {}
-                    throw new Error(detail);
-                }
-
-                updateAgentProgress(progressRow, 'Hermes 已讀取指令，正在執行');
-                const payload = await taskResp.json();
-                if (payload.result) {
-                    const state = payload.result.status === 'DONE' ? 'complete' : 'failed';
-                    const text = payload.result.status === 'DONE' ? 'Hermes 執行完成' : 'Hermes 執行未完成';
-                    updateAgentProgress(progressRow, text, state);
-                    appendAgentReply(terminal, payload.result, { dedupe: true });
-                    await updateLogs();
-                    await updateDashboard();
-                    btn.innerText = "啟動代理";
-                    btn.style.opacity = "1";
-                    return;
-                }
-            } catch (e) {
-                updateAgentProgress(progressRow, 'Hermes 未成功接收指令', 'failed');
-                appendAgentReply(terminal, {
-                    status: 'FAILED',
-                    task: task,
-                    response: '',
-                    error: e.message || 'Hermes 未成功接收指令'
-                }, { dedupe: true });
-                await updateLogs();
-                await updateDashboard();
-                btn.innerText = "啟動代理";
-                btn.style.opacity = "1";
-                return;
-            }
-            
-            // 任務發送後立即開始高頻輪詢
-            const logInterval = setInterval(async () => {
-                try {
-                    await updateLogs();
-                    const statusResp = await fetch('/api/status');
-                    const status = await statusResp.json();
-                    updateAgentProgress(progressRow, `Hermes 執行中：${status.current_state}`);
-
-                    if (status.current_state === 'DONE' || status.current_state === 'FAILED') {
-                        const state = status.current_state === 'DONE' ? 'complete' : 'failed';
-                        const text = status.current_state === 'DONE' ? 'Hermes 執行完成' : 'Hermes 執行失敗';
-                        updateAgentProgress(progressRow, text, state);
-                        if (status.last_result) {
-                            appendAgentReply(terminal, status.last_result, { dedupe: true });
-                        }
-                        clearInterval(logInterval);
-                        btn.innerText = "啟動代理";
-                        btn.style.opacity = "1";
-                    }
-                } catch (e) {
-                    updateAgentProgress(progressRow, 'Hermes 狀態讀取中斷', 'failed');
-                    clearInterval(logInterval);
-                    btn.innerText = "啟動代理";
-                    btn.style.opacity = "1";
-                }
-            }, 1000);
-        }
-
-        // === Patch Review System ===
-        let currentPatchId = null;
 
         async function checkForPendingPatches() {
-            if (document.getElementById('patch-overlay').style.display === 'flex') return;
             try {
                 const resp = await fetch('/api/patch/pending');
+                if (!resp.ok) return;
                 const patches = await resp.json();
-                if (patches.length > 0) {
-                    showPatchReview(patches[0]);
-                }
+                const panel = document.getElementById('patch-preview');
+                if (panel) panel.textContent = Array.isArray(patches) && patches.length ? JSON.stringify(patches, null, 2) : 'No pending patches.';
             } catch (e) {}
         }
 
-        function showPatchReview(patch) {
-            currentPatchId = patch.id;
-            document.getElementById('patch-overlay').style.display = 'flex';
-            document.getElementById('patch-id-label').innerText = `ID: ${patch.id}`;
-            document.getElementById('patch-risk-badge').innerText = `RISK: ${patch.risk || 'LOW'}`;
-            
-            const diffView = document.getElementById('patch-diff-view');
-            diffView.innerHTML = '';
-            
-            const lines = patch.diff.split('\n');
-            lines.forEach(line => {
-                const div = document.createElement('div');
-                div.className = 'diff-line';
-                if (line.startsWith('+')) div.classList.add('diff-add');
-                else if (line.startsWith('-')) div.classList.add('diff-del');
-                else if (line.startsWith('@@') || line.startsWith('---') || line.startsWith('+++')) div.classList.add('diff-meta');
-                div.textContent = line;
-                diffView.appendChild(div);
-            });
+        function renderRawLogPreview(logs) {
+            const panel = document.getElementById('raw-log-preview');
+            if (panel) panel.textContent = JSON.stringify(logs || [], null, 2);
         }
 
-        function closePatchReview() {
-            document.getElementById('patch-overlay').style.display = 'none';
-            currentPatchId = null;
+        function loadSystemPrompt() {
+            const saved = localStorage.getItem(SYSTEM_PROMPT_STORAGE_KEY);
+            if (!saved) return;
+            state.systemPrompt = saved;
         }
 
-        async function executePatchApproval() {
-            if (!currentPatchId) return;
-            const btn = document.getElementById('approve-btn');
-            btn.innerText = "AUTHORIZING...";
-            btn.disabled = true;
-
-            try {
-                // 1. Approve & Get Token
-                const appResp = await fetch(`/api/patch/approve/${currentPatchId}`, { method: 'POST' });
-                const { token } = await appResp.json();
-                
-                // 2. Apply with Token
-                const applyResp = await fetch('/api/patch/apply', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ patch_id: currentPatchId, token: token })
-                });
-                
-                if (applyResp.ok) {
-                    alert("Patch Applied Successfully!");
-                    closePatchReview();
-                    updateLogs();
-                } else {
-                    const err = await applyResp.json();
-                    alert("Apply Failed: " + err.detail);
-                }
-            } catch (e) {
-                alert("Approval Error: " + e.message);
-            } finally {
-                btn.innerText = "APPROVE & APPLY";
-                btn.disabled = false;
-            }
+        function saveSystemPrompt() {
+            const prompt = state.systemPrompt || '';
+            localStorage.setItem(SYSTEM_PROMPT_STORAGE_KEY, prompt);
         }
 
-        const savedLang = localStorage.getItem('hermes_lang') || 'zh';
-        document.getElementById('lang-select').value = savedLang;
-        loadSystemPrompt();
-        document.getElementById('sys-prompt').addEventListener('input', saveSystemPrompt);
-        changeLang(savedLang);
-        setInterval(updateDashboard, 5000);
-        setInterval(updateLogs, 3000);
+        function clearSystemPrompt() {
+            state.systemPrompt = '';
+            localStorage.removeItem(SYSTEM_PROMPT_STORAGE_KEY);
+        }
+
+        function describeApiError(resp, data) {
+            if (window.HermesApi) return window.HermesApi.describeApiError(resp, data);
+            const error = data && data.error ? data.error : {};
+            const status = error.status || (resp && resp.status) || 'ERR';
+            const code = error.code || data.detail || 'REQUEST_FAILED';
+            const message = error.message || data.detail || (resp ? resp.statusText : 'Unknown error');
+            return `${status} ${code}: ${message}`;
+        }
+
+        /* === Utils === */
+        function formatContent(text) {
+            if (!text) return "";
+            let html = escapeHtml(text);
+            html = html.replace(/```([\s\S]*?)```/g, (m, c) => `<pre><code>${c.trim()}</code></pre>`);
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/\n/g, '<br>');
+            return html;
+        }
+
+        function escapeHtml(unsafe) {
+            return String(unsafe).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
+        }
         setInterval(checkForPendingPatches, 4000);
         updateLogs();
         updateDashboard({ renderResult: true });
