@@ -68,6 +68,7 @@ class TestDashboardInteractions(unittest.TestCase):
         self.assertIn('<option value="qwen3:14b" selected>Qwen3 14B (Ollama)</option>', self.html)
         self.assertIn('<option value="mock">Mock Demo (UI流程測試，非真實回答)</option>', self.html)
         self.assertIn("Mock Demo (流程測試)", self.html)
+        self.assertIn("advanced-settings", self.html)
 
     def test_dashboard_restores_last_reply_on_initial_load(self):
         self.assertIn(

@@ -13,8 +13,25 @@ class TestDashboardWorkbenchUI(unittest.TestCase):
         self.assertIn("Message Hermes Agent...", self.dashboard)
         self.assertIn("composer-iconbar", self.dashboard)
         self.assertIn("aria-label=\"Send message\"", self.dashboard)
+        self.assertIn("advanced-settings", self.dashboard)
         self.assertIn("default", self.dashboard)
         self.assertIn("Home", self.dashboard)
+        self.assertNotIn('<span class="control-btn">Mock Demo (流程測試)</span>', self.dashboard)
+
+    def test_workspace_tabs_hide_scrollbar_and_support_wheel_scroll(self):
+        self.assertIn("scrollbar-width: none", self.dashboard)
+        self.assertIn(".workspace-tabs::-webkit-scrollbar", self.dashboard)
+        self.assertIn("bindHorizontalWheelScroll", self.dashboard)
+        self.assertIn("deltaY", self.dashboard)
+
+    def test_sidebar_replaces_placeholder_tools_with_management_roles(self):
+        self.assertIn("Management Decision Layer", self.dashboard)
+        for role in ["Executive", "Strategy", "Operator", "Auditor"]:
+            self.assertIn(f'data-role="{role.lower()}"', self.dashboard)
+
+        self.assertNotIn("<span>📁</span> Projects", self.dashboard)
+        self.assertNotIn("<span>⚡</span> Skills", self.dashboard)
+        self.assertNotIn("<span>⚙️</span> Settings", self.dashboard)
 
     def test_left_rail_contains_modules_and_history_groups(self):
         for module in ["Chat", "Calendar", "Layers", "Memory", "Files", "Profile", "Queue"]:

@@ -92,6 +92,7 @@
             display: flex;
             flex-direction: column;
             gap: 4px;
+            margin-bottom: 18px;
         }
         .module-rail {
             display: grid;
@@ -136,6 +137,41 @@
         .nav-item.active {
             background: var(--accent-soft);
             color: var(--accent);
+        }
+        .decision-nav {
+            padding: 0 16px 18px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .decision-nav-title {
+            color: var(--text-muted);
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.09em;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        .decision-role {
+            display: grid;
+            grid-template-columns: 28px minmax(0, 1fr);
+            gap: 10px;
+            align-items: center;
+            padding: 9px 10px;
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+        .decision-role.active,
+        .decision-role:hover {
+            background: rgba(214, 184, 79, 0.08);
+            border-color: rgba(214, 184, 79, 0.18);
+            color: var(--text-primary);
+        }
+        .decision-role-code {
+            color: var(--accent);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 800;
         }
 
         .sidebar-section {
@@ -329,6 +365,9 @@
             color: var(--text-muted);
         }
         .composer-icon:hover { color: var(--accent); background: rgba(255,255,255,0.04); }
+        .advanced-settings {
+            display: none;
+        }
 
         /* Workspace Panels */
         .workspace-area {
@@ -342,7 +381,12 @@
             border-bottom: 1px solid var(--border-subtle);
             gap: 4px;
             overflow-x: auto;
-            scrollbar-width: thin;
+            scrollbar-width: none;
+            overscroll-behavior-inline: contain;
+            cursor: default;
+        }
+        .workspace-tabs::-webkit-scrollbar {
+            display: none;
         }
         .tab-item {
             padding: 10px 16px;
@@ -646,16 +690,23 @@
             <div class="nav-item active" onclick="location.reload()">
                 <span>🏠</span> Workbench
             </div>
-            <div class="nav-item">
-                <span>📁</span> Projects
-            </div>
-            <div class="nav-item">
-                <span>⚡</span> Skills
-            </div>
-            <div class="nav-item">
-                <span>⚙️</span> Settings
-            </div>
         </nav>
+
+        <div class="decision-nav" aria-label="Management Decision Layer">
+            <div class="decision-nav-title">Management Decision Layer</div>
+            <div class="decision-role active" data-role="executive">
+                <span class="decision-role-code">L1</span><span>Executive</span>
+            </div>
+            <div class="decision-role" data-role="strategy">
+                <span class="decision-role-code">L2</span><span>Strategy</span>
+            </div>
+            <div class="decision-role" data-role="operator">
+                <span class="decision-role-code">L3</span><span>Operator</span>
+            </div>
+            <div class="decision-role" data-role="auditor">
+                <span class="decision-role-code">L4</span><span>Auditor</span>
+            </div>
+        </div>
 
         <div class="module-rail" aria-label="Hermes modules">
             <button class="module-btn active" data-module="chat" title="Chat">▱</button>
@@ -720,19 +771,23 @@
                             <option value="qwen3:14b" selected>Qwen3 14B (Ollama)</option>
                             <option value="llama3">Llama 3 (Ollama)</option>
                             <option value="gemma3">Gemma 3 (Ollama)</option>
-                            <option value="mock">Mock Demo (UI流程測試，非真實回答)</option>
-                        </select>
-                        <select class="control-btn" aria-label="Profile">
-                            <option>default</option>
-                        </select>
-                        <select class="control-btn" aria-label="Workspace">
-                            <option>Home</option>
-                            <option>Workspace: Root</option>
                         </select>
                         <span class="permission-badge">MODE: MANAGED_AGENT</span>
-                        <span class="control-btn">Mock Demo (流程測試)</span>
                     </div>
                     <button class="btn-send" onclick="sendTask()" aria-label="Send message">↑</button>
+                </div>
+                <div class="advanced-settings" aria-label="Advanced Settings">
+                    <select class="control-btn" aria-label="Profile">
+                        <option>default</option>
+                    </select>
+                    <select class="control-btn" aria-label="Workspace">
+                        <option>Home</option>
+                        <option>Workspace: Root</option>
+                    </select>
+                    <select class="control-btn" aria-label="Flow test provider">
+                        <option value="mock">Mock Demo (UI流程測試，非真實回答)</option>
+                    </select>
+                    <span>Mock Demo (流程測試)</span>
                 </div>
             </div>
         </div>
@@ -878,6 +933,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             loadSystemPrompt();
             loadFileTree(state.workspace);
+            bindHorizontalWheelScroll(document.querySelector('.workspace-tabs'));
             updateUI();
             setInterval(syncLogs, 3000);
         });
@@ -910,6 +966,15 @@
         function autoResize(textarea) {
             textarea.style.height = 'auto';
             textarea.style.height = textarea.scrollHeight + 'px';
+        }
+
+        function bindHorizontalWheelScroll(element) {
+            if (!element) return;
+            element.addEventListener('wheel', (event) => {
+                if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+                event.preventDefault();
+                element.scrollLeft += event.deltaY;
+            }, { passive: false });
         }
 
         /* === Message Rendering === */
