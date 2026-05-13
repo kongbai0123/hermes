@@ -9,6 +9,12 @@
 
     async function fetchJson(url, options = {}) {
         const resp = await fetch(url, options);
+        const contentType = resp.headers.get("content-type") || "";
+        if (!contentType.toLowerCase().includes("application/json")) {
+            const text = await resp.text();
+            const preview = text.trim().slice(0, 80).replace(/\s+/g, " ");
+            throw new Error(`${resp.status || "ERR"} API returned HTML or non-JSON response. Check that ${url} is served by the Hermes API, then restart Hermes. Preview: ${preview}`);
+        }
         const data = await resp.json();
         if (!resp.ok || data.ok === false) {
             throw new Error(describeApiError(resp, data));

@@ -1,0 +1,40 @@
+import unittest
+from pathlib import Path
+
+
+class TestDashboardWorkbenchUI(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.dashboard = Path("hermes/api/dashboard.html").read_text(encoding="utf-8")
+        cls.api_js = Path("hermes/api/static/api.js").read_text(encoding="utf-8")
+        cls.renderers_js = Path("hermes/api/static/renderers.js").read_text(encoding="utf-8")
+
+    def test_chat_composer_matches_agent_workbench_contract(self):
+        self.assertIn("Message Hermes Agent...", self.dashboard)
+        self.assertIn("composer-iconbar", self.dashboard)
+        self.assertIn("aria-label=\"Send message\"", self.dashboard)
+        self.assertIn("default", self.dashboard)
+        self.assertIn("Home", self.dashboard)
+
+    def test_left_rail_contains_modules_and_history_groups(self):
+        for module in ["Chat", "Calendar", "Layers", "Memory", "Files", "Profile", "Queue"]:
+            self.assertIn(f'data-module="{module.lower()}"', self.dashboard)
+
+        for group in ["PINNED", "TODAY", "EARLIER"]:
+            self.assertIn(group, self.dashboard)
+
+    def test_mcp_panel_uses_card_contract_not_raw_text_only(self):
+        self.assertIn("mcp-server-list", self.dashboard)
+        self.assertIn("mcp-tool-list", self.dashboard)
+        self.assertIn("mcp-call-list", self.dashboard)
+        self.assertIn("mcp-status-card", self.renderers_js)
+        self.assertIn("Recent MCP Calls", self.renderers_js)
+
+    def test_api_reports_html_fallback_as_diagnostic_error(self):
+        self.assertIn("API returned HTML", self.api_js)
+        self.assertIn("restart Hermes", self.api_js)
+        self.assertIn("content-type", self.api_js.lower())
+
+
+if __name__ == "__main__":
+    unittest.main()
