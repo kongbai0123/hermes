@@ -33,6 +33,29 @@ class TestDashboardWorkbenchUI(unittest.TestCase):
         self.assertNotIn("<span>⚡</span> Skills", self.dashboard)
         self.assertNotIn("<span>⚙️</span> Settings", self.dashboard)
 
+    def test_left_sidebar_actions_are_functional(self):
+        self.assertIn("startNewChat()", self.dashboard)
+        self.assertIn("openToolBox('search')", self.dashboard)
+        self.assertIn("openToolBox('extensions')", self.dashboard)
+        self.assertIn("openToolBox('automation')", self.dashboard)
+        self.assertIn("openUserSettings()", self.dashboard)
+        self.assertIn("New Chat", self.dashboard)
+        self.assertIn("Search", self.dashboard)
+        self.assertIn("Extensions", self.dashboard)
+        self.assertIn("Automations", self.dashboard)
+        self.assertIn("User Settings", self.dashboard)
+
+    def test_history_items_load_session_content(self):
+        self.assertIn("loadSession(", self.dashboard)
+        self.assertIn("SESSION_CONTENT", self.dashboard)
+        self.assertIn("data-session=", self.dashboard)
+        self.assertIn("renderSessionHistory", self.dashboard)
+
+    def test_module_rail_buttons_have_real_actions(self):
+        self.assertIn("bindModuleRailActions", self.dashboard)
+        self.assertIn("openModuleTool", self.dashboard)
+        self.assertIn("data-module=\"chat\"", self.dashboard)
+
     def test_left_rail_contains_modules_and_history_groups(self):
         for module in ["Chat", "Calendar", "Layers", "Memory", "Files", "Profile", "Queue"]:
             self.assertIn(f'data-module="{module.lower()}"', self.dashboard)

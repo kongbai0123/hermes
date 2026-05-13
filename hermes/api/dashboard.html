@@ -138,6 +138,16 @@
             background: var(--accent-soft);
             color: var(--accent);
         }
+        .nav-count {
+            margin-left: auto;
+            min-width: 20px;
+            padding: 2px 7px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.07);
+            color: var(--text-secondary);
+            font-size: 11px;
+            text-align: center;
+        }
         .decision-nav {
             padding: 0 16px 18px;
             border-bottom: 1px solid var(--border-subtle);
@@ -213,6 +223,37 @@
         .session-item.active {
             background: rgba(255, 255, 255, 0.03);
             color: var(--accent);
+        }
+        .toolbox-card {
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-elevated);
+            border-radius: var(--radius-md);
+            padding: 14px;
+            margin: 12px;
+        }
+        .toolbox-card h3 {
+            margin: 0 0 8px;
+            font-size: 13px;
+        }
+        .toolbox-card p {
+            color: var(--text-secondary);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .toolbox-input {
+            width: 100%;
+            background: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-primary);
+            border-radius: var(--radius-sm);
+            padding: 9px 10px;
+            outline: none;
+        }
+        .toolbox-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 10px;
         }
 
         /* Main Content */
@@ -687,8 +728,20 @@
         </div>
 
         <nav class="sidebar-nav">
-            <div class="nav-item active" onclick="location.reload()">
-                <span>🏠</span> Workbench
+            <div class="nav-item active" onclick="startNewChat()">
+                <span>✎</span> New Chat
+            </div>
+            <div class="nav-item" onclick="openToolBox('search')">
+                <span>⌕</span> Search
+            </div>
+            <div class="nav-item" onclick="openToolBox('extensions')">
+                <span>⌘</span> Extensions
+            </div>
+            <div class="nav-item" onclick="openToolBox('automation')">
+                <span>◷</span> Automations <span class="nav-count">1</span>
+            </div>
+            <div class="nav-item" onclick="openUserSettings()">
+                <span>♙</span> User Settings
             </div>
         </nav>
 
@@ -722,14 +775,14 @@
             <div class="section-label">History</div>
             <div class="session-list" id="session-list">
                 <div class="history-group">PINNED</div>
-                <div class="session-item active">Can you lead an upgraded version of Hermes?</div>
-                <div class="session-item">Testing default profile right?</div>
+                <div class="session-item active" data-session="upgrade" onclick="loadSession('upgrade')">Can you lead an upgraded version of Hermes?</div>
+                <div class="session-item" data-session="profile" onclick="loadSession('profile')">Testing default profile right?</div>
                 <div class="history-group">TODAY</div>
-                <div class="session-item">What time is it?</div>
-                <div class="session-item">MCP workspace read check</div>
+                <div class="session-item" data-session="time" onclick="loadSession('time')">What time is it?</div>
+                <div class="session-item" data-session="mcp" onclick="loadSession('mcp')">MCP workspace read check</div>
                 <div class="history-group">EARLIER</div>
-                <div class="session-item">Full sweep browser check</div>
-                <div class="session-item">QA sanity check message 1</div>
+                <div class="session-item" data-session="browser" onclick="loadSession('browser')">Full sweep browser check</div>
+                <div class="session-item" data-session="qa" onclick="loadSession('qa')">QA sanity check message 1</div>
             </div>
         </div>
     </aside>
@@ -927,6 +980,50 @@
             logs: [],
             lastLogIndex: -1
         };
+        const SESSION_CONTENT = {
+            upgrade: {
+                title: "Can you lead an upgraded version of Hermes?",
+                messages: [
+                    { type: "user", text: "Can you lead an upgraded version of Hermes?" },
+                    { type: "reply", text: "可以。這個 session 聚焦在 Managed Agent OS：Management Decision Layer、MCP governance、Dashboard workbench 與可驗證工具鏈。" }
+                ]
+            },
+            profile: {
+                title: "Testing default profile right?",
+                messages: [
+                    { type: "user", text: "Testing default profile right?" },
+                    { type: "reply", text: "目前 profile contract 為 default，設定入口已放回 User Settings。" }
+                ]
+            },
+            time: {
+                title: "What time is it?",
+                messages: [
+                    { type: "user", text: "What time is it?" },
+                    { type: "reply", text: "這是歷史對話預覽。實際時間查詢應由 Runtime tool 或系統時間 API 回覆。" }
+                ]
+            },
+            mcp: {
+                title: "MCP workspace read check",
+                messages: [
+                    { type: "user", text: "請用 MCP 讀取 README.md" },
+                    { type: "reply", text: "MCP local_workspace.read_file 已可透過治理鏈讀取 README.md，Trace 會顯示 MCP_TOOL_CALL / MCP_TOOL_RESULT。" }
+                ]
+            },
+            browser: {
+                title: "Full sweep browser check",
+                messages: [
+                    { type: "user", text: "Full sweep browser check" },
+                    { type: "reply", text: "Dashboard、Files API、MCP cards、composer 與 history contract 已納入測試。" }
+                ]
+            },
+            qa: {
+                title: "QA sanity check message 1",
+                messages: [
+                    { type: "user", text: "QA sanity check message 1" },
+                    { type: "reply", text: "Sanity check session loaded from local dashboard history." }
+                ]
+            }
+        };
         const SYSTEM_PROMPT_STORAGE_KEY = 'hermes_system_prompt';
 
         /* === Initialization === */
@@ -934,6 +1031,8 @@
             loadSystemPrompt();
             loadFileTree(state.workspace);
             bindHorizontalWheelScroll(document.querySelector('.workspace-tabs'));
+            bindModuleRailActions();
+            renderSessionHistory();
             updateUI();
             setInterval(syncLogs, 3000);
         });
@@ -975,6 +1074,131 @@
                 event.preventDefault();
                 element.scrollLeft += event.deltaY;
             }, { passive: false });
+        }
+
+        function renderSessionHistory() {
+            document.querySelectorAll('.session-item[data-session]').forEach(item => {
+                item.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        loadSession(item.dataset.session);
+                    }
+                });
+                item.setAttribute('tabindex', '0');
+                item.setAttribute('role', 'button');
+            });
+        }
+
+        function resetTerminalSystem(text = "Welcome to Hermes Professional Workbench. Ready for execution.") {
+            const terminal = document.getElementById('terminal');
+            terminal.innerHTML = `
+                <div class="agent-reply">
+                    <div class="reply-label">SYSTEM</div>
+                    <div class="reply-body">${escapeHtml(text)}</div>
+                </div>
+            `;
+        }
+
+        function startNewChat() {
+            state.currentSession = "New Chat";
+            state.lastLogIndex = -1;
+            resetTerminalSystem("New chat created. Ask Hermes Agent to plan, inspect, generate, or verify a task.");
+            document.getElementById('task-input').value = '';
+            document.getElementById('task-input').focus();
+            document.querySelectorAll('.session-item').forEach(item => item.classList.remove('active'));
+            updateUI();
+        }
+
+        function loadSession(sessionId) {
+            const session = SESSION_CONTENT[sessionId];
+            if (!session) return;
+            state.currentSession = session.title;
+            resetTerminalSystem(`Loaded history: ${session.title}`);
+            session.messages.forEach(message => appendMessage(message.type, { text: message.text }));
+            document.querySelectorAll('.session-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.session === sessionId);
+            });
+            updateUI();
+        }
+
+        function bindModuleRailActions() {
+            document.querySelectorAll('.module-btn[data-module]').forEach(button => {
+                button.addEventListener('click', () => openModuleTool(button.dataset.module));
+            });
+        }
+
+        function openModuleTool(moduleName) {
+            document.querySelectorAll('.module-btn').forEach(button => button.classList.toggle('active', button.dataset.module === moduleName));
+            const route = {
+                chat: () => startNewChat(),
+                calendar: () => openToolBox('automation'),
+                layers: () => switchTab('decision'),
+                memory: () => openToolBox('search'),
+                files: () => switchTab('files'),
+                profile: () => openUserSettings(),
+                queue: () => openToolBox('automation')
+            }[moduleName];
+            if (route) route();
+        }
+
+        function openToolBox(type) {
+            if (type === 'extensions') {
+                switchTab('mcp');
+                return;
+            }
+            switchTab('tools');
+            renderToolBox(type);
+        }
+
+        function openUserSettings() {
+            switchTab('tools');
+            renderToolBox('settings');
+        }
+
+        function renderToolBox(type) {
+            const panel = document.getElementById('panel-tools');
+            if (!panel) return;
+            const templates = {
+                search: `
+                    <div class="toolbox-card">
+                        <h3>Search History</h3>
+                        <p>Filter local dashboard history and jump into a session.</p>
+                        <input class="toolbox-input" id="history-search" placeholder="Search sessions..." oninput="filterHistory(this.value)">
+                    </div>
+                `,
+                automation: `
+                    <div class="toolbox-card">
+                        <h3>Automations</h3>
+                        <p>Daily Hermes self-review is queued as a governance concept. Runtime scheduling can attach here next.</p>
+                        <div class="toolbox-actions"><button class="control-btn" type="button" onclick="appendMessage('reply', {text:'Automation queue inspected. No executable schedule is started from the UI yet.'})">Inspect queue</button></div>
+                    </div>
+                `,
+                settings: `
+                    <div class="toolbox-card">
+                        <h3>User Settings</h3>
+                        <p>Visible settings restored here instead of cluttering the composer.</p>
+                        <label class="mcp-card-meta">Profile</label>
+                        <select class="toolbox-input"><option>default</option></select>
+                        <label class="mcp-card-meta">Workspace</label>
+                        <select class="toolbox-input"><option>Home</option><option>Workspace: Root</option></select>
+                        <label class="mcp-card-meta">Flow Test Provider</label>
+                        <select class="toolbox-input"><option>Mock Demo (UI流程測試，非真實回答)</option></select>
+                    </div>
+                `
+            };
+            panel.innerHTML = templates[type] || `
+                <div class="toolbox-card">
+                    <h3>${escapeHtml(type)}</h3>
+                    <p>This toolbox is registered but has no active controls yet.</p>
+                </div>
+            `;
+        }
+
+        function filterHistory(query) {
+            const q = String(query || '').toLowerCase();
+            document.querySelectorAll('.session-item[data-session]').forEach(item => {
+                item.style.display = item.textContent.toLowerCase().includes(q) ? '' : 'none';
+            });
         }
 
         /* === Message Rendering === */
