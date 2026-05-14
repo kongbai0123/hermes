@@ -10,6 +10,7 @@ from hermes.harness.patch import PatchProposal, FileChange
 from hermes.harness.diff_engine import DiffEngine
 from hermes.harness.approval import ApprovalManager
 from hermes.harness.shell import GovernedShellExecutor
+from hermes.markdown.report import extract_markdown_toc, summarize_markdown_report
 
 class SafeExecutor:
     """
@@ -65,6 +66,78 @@ class SafeExecutor:
                 if len(results) >= 100: break
             return ToolResult(ok=True, tool="grep_search", summary=f"Found {len(results)} matches", content="\n".join(results))
         except Exception as e: return ToolResult(ok=False, tool="grep_search", summary="Error", error=str(e))
+
+    def read_markdown_report(self, path: str, max_chars: Optional[int] = None) -> ToolResult:
+        read = self.read_file(path=path, max_chars=max_chars)
+        if not read.ok:
+            return ToolResult(ok=False, tool="read_markdown_report", summary=read.summary, error=read.error)
+        report = summarize_markdown_report(read.content)
+        return ToolResult(
+            ok=True,
+            tool="read_markdown_report",
+            summary=f"Markdown report read: {report['title']}",
+            content=read.content,
+            metadata=report,
+        )
+
+    def preview_report(self, path: str, max_chars: Optional[int] = None) -> ToolResult:
+        result = self.read_markdown_report(path=path, max_chars=max_chars)
+        if not result.ok:
+            return ToolResult(ok=False, tool="preview_report", summary=result.summary, error=result.error)
+        preview_lines = [
+            f"# {result.metadata.get('title', 'Markdown report')}",
+            "",
+            "## TOC",
+            *[f"- L{item['level']} {item['text']} (line {item['line']})" for item in result.metadata.get("toc", [])],
+            "",
+            "## Summary",
+            result.metadata.get("summary", ""),
+        ]
+        return ToolResult(
+            ok=True,
+            tool="preview_report",
+            summary=f"Markdown preview prepared: {result.metadata.get('title', 'Markdown report')}",
+            content="\n".join(preview_lines),
+            metadata=result.metadata,
+        )
+
+    def extract_markdown_toc(self, path: str) -> ToolResult:
+        read = self.read_file(path=path)
+        if not read.ok:
+            return ToolResult(ok=False, tool="extract_markdown_toc", summary=read.summary, error=read.error)
+        toc = extract_markdown_toc(read.content)
+        return ToolResult(
+            ok=True,
+            tool="extract_markdown_toc",
+            summary=f"Extracted {len(toc)} headings",
+            content="\n".join([f"L{item['level']} {item['text']} (line {item['line']})" for item in toc]),
+            metadata={"toc": toc},
+        )
+
+    def propose_leaf_inline_preview(self, path: str) -> ToolResult:
+        is_safe, target_path_str = self.constraints.validate_path(path)
+        if not is_safe:
+            return ToolResult(ok=False, tool="propose_leaf_inline_preview", summary="Access Denied", error=target_path_str)
+        target = Path(target_path_str)
+        if not target.is_file():
+            return ToolResult(ok=False, tool="propose_leaf_inline_preview", summary="Not a file", error="Target is not a file.")
+        command = f"leaf --inline {path}"
+        return ToolResult(
+            ok=True,
+            tool="propose_leaf_inline_preview",
+            summary="Leaf inline preview proposal created",
+            content=(
+                "Optional external viewer proposal only. Hermes will not install or execute Leaf automatically.\n"
+                f"Command: {command}\n"
+                "Risk: read-only external CLI preview. Execution must go through governed shell approval if used."
+            ),
+            metadata={
+                "command": command,
+                "permission": "read",
+                "executes": False,
+                "requires_approval": True,
+            },
+        )
 
     def generate_design_artifact(self, goal: str, path: str = ".") -> ToolResult:
         """

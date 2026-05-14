@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 from hermes.core.runtime import HermesRuntime
 from hermes.core.llm_provider import MockLLMProvider, create_llm_provider
-from hermes.api.files import list_workspace_files, read_workspace_file, status_from_result
+from hermes.api.files import list_workspace_files, read_workspace_file, stat_workspace_file, status_from_result
 
 app = FastAPI(title="Hermes Agent OS API")
 
@@ -156,6 +156,12 @@ async def list_files(path: str = "."):
 @app.get("/api/files/read")
 async def read_file(path: str):
     result = read_workspace_file(runtime.constraints.workspace_root, path)
+    return JSONResponse(result, status_code=status_from_result(result))
+
+@app.get("/files/stat")
+@app.get("/api/files/stat")
+async def stat_file(path: str):
+    result = stat_workspace_file(runtime.constraints.workspace_root, path)
     return JSONResponse(result, status_code=status_from_result(result))
 
 if __name__ == "__main__":

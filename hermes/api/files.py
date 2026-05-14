@@ -134,6 +134,25 @@ def read_workspace_file(workspace_root: str | Path, path: str, max_bytes: int = 
     }
 
 
+def stat_workspace_file(workspace_root: str | Path, path: str) -> dict[str, Any]:
+    target, error = _safe_resolve(workspace_root, path)
+    if error:
+        return error
+    if target is None or not target.exists():
+        return api_error("NOT_FOUND", f"Path '{path}' does not exist.", status=404, details={"path": path})
+    if not target.is_file():
+        return api_error("NOT_FILE", f"Path '{path}' is not a file.", status=400, details={"path": path})
+    stat = target.stat()
+    signature = f"{int(stat.st_mtime_ns)}:{stat.st_size}"
+    return {
+        "ok": True,
+        "path": _relative_path(workspace_root, target),
+        "size": stat.st_size,
+        "mtime": stat.st_mtime,
+        "signature": signature,
+    }
+
+
 def status_from_result(result: dict[str, Any]) -> int:
     if result.get("ok"):
         return 200

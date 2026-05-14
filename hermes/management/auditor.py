@@ -44,6 +44,12 @@ class ManagementAuditor:
                 risk_notes.append(f"{step.id}: shell command gated by approval proposal")
             if step.tool == "execute_approved_shell":
                 failed.append(f"{step.id}: direct shell execution is not allowed in managed plan")
+            if step.tool == "propose_leaf_inline_preview":
+                if result.metadata.get("executes") is not False:
+                    failed.append(f"{step.id}: Leaf proposal must not execute directly")
+                if result.metadata.get("requires_approval") is not True:
+                    failed.append(f"{step.id}: Leaf proposal must require approval")
+                risk_notes.append(f"{step.id}: Leaf external viewer gated as proposal only")
 
             if step.type == "write":
                 target = str((result.metadata or {}).get("path", "")).replace("\\", "/")
@@ -96,6 +102,10 @@ class ManagementAuditor:
             return any(str(step.tool).startswith("mcp.") and result.ok for step, result in step_results)
         if "直接回答" in criterion:
             return True
+        if "Leaf" in criterion or "leaf" in criterion or "optional external viewer" in criterion or "長駐程序" in criterion:
+            return any(step.tool == "propose_leaf_inline_preview" and result.ok for step, result in step_results)
+        if "若要執行必須走 governed shell approval" in criterion:
+            return any(step.tool == "propose_leaf_inline_preview" and result.metadata.get("requires_approval") is True for step, result in step_results)
         if "shell proposal" in criterion or "approval token" in criterion or "governed shell" in criterion:
             return any(step.tool == "propose_shell_command" and result.ok for step, result in step_results)
         return bool(step_results)

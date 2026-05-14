@@ -2,6 +2,7 @@
     const API_ENDPOINTS = {
         filesList: ["/api/files/list", "/files/list"],
         filesRead: ["/api/files/read", "/files/read"],
+        filesStat: ["/api/files/stat", "/files/stat"],
         logs: ["/api/logs", "/logs"],
         task: ["/api/task", "/task"]
     };
@@ -51,6 +52,9 @@
         },
         readFile(path) {
             return requestFirstJson(API_ENDPOINTS.filesRead, url => `${url}?path=${encodeURIComponent(path)}`);
+        },
+        statFile(path) {
+            return requestFirstJson(API_ENDPOINTS.filesStat, url => `${url}?path=${encodeURIComponent(path)}`);
         },
         fetchLogs() {
             return requestFirstJson(API_ENDPOINTS.logs);

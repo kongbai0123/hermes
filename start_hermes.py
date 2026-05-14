@@ -6,7 +6,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from hermes.core.runtime import HermesRuntime
 from hermes.core.llm_provider import MockLLMProvider, create_llm_provider
-from hermes.api.files import list_workspace_files, read_workspace_file, status_from_result
+from hermes.api.files import list_workspace_files, read_workspace_file, stat_workspace_file, status_from_result
 
 PORT = int(os.getenv("HERMES_PORT", "8000"))
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -44,6 +44,9 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(result, status_from_result(result))
         elif route in ("/api/files/read", "/files/read"):
             result = read_workspace_file(runtime.constraints.workspace_root, query.get("path", [""])[0])
+            self._send_json(result, status_from_result(result))
+        elif route in ("/api/files/stat", "/files/stat"):
+            result = stat_workspace_file(runtime.constraints.workspace_root, query.get("path", [""])[0])
             self._send_json(result, status_from_result(result))
         elif route == "/api/shell/pending":
             actions = runtime.executor.shell_approval_manager.pending_actions

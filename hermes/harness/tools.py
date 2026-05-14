@@ -35,6 +35,30 @@ class ToolRegistry:
             handler=executor.grep_search
         ))
         self.add_tool(ToolSpec(
+            name="read_markdown_report",
+            description="讀取 Markdown 報告並回傳摘要與 TOC。參數: {'path': '路徑'}",
+            permission="read",
+            handler=executor.read_markdown_report
+        ))
+        self.add_tool(ToolSpec(
+            name="preview_report",
+            description="產生 Markdown 報告預覽，包含 TOC 與摘要。參數: {'path': '路徑'}",
+            permission="read",
+            handler=executor.preview_report
+        ))
+        self.add_tool(ToolSpec(
+            name="extract_markdown_toc",
+            description="抽取 Markdown 文件目次。參數: {'path': '路徑'}",
+            permission="read",
+            handler=executor.extract_markdown_toc
+        ))
+        self.add_tool(ToolSpec(
+            name="propose_leaf_inline_preview",
+            description="提出 Leaf optional inline preview 指令建議，不安裝、不執行。參數: {'path': 'Markdown 路徑'}",
+            permission="write_proposal",
+            handler=executor.propose_leaf_inline_preview
+        ))
+        self.add_tool(ToolSpec(
             name="generate_design_artifact",
             description="生成設計/網站/應用/內容項目的安全草案，不寫入硬碟。參數: {'goal': '使用者想生成的項目', 'path': '參考工作區路徑'}",
             permission="generate",

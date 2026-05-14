@@ -52,6 +52,23 @@ class ManagementPolicy:
                 notes={"reason": "shell is disabled before management governance is complete"},
             )
 
+        if self._contains_any(lowered, ["leaf preview", "leaf --inline", "leaf 預覽", "用 leaf"]):
+            return self._decision(
+                text,
+                "leaf_preview",
+                "requires_user_approval",
+                requires_tools=True,
+                requires_write=False,
+                requires_user_approval=True,
+                criteria=[
+                    "Leaf 只能作為 optional external viewer proposal",
+                    "不得自動安裝 Leaf",
+                    "不得自動啟動 watch 長駐程序",
+                    "若要執行必須走 governed shell approval",
+                ],
+                notes={"external_tool_risk": "medium"},
+            )
+
         if self._contains_any(lowered, ["apply patch", "套用 patch", "套用變更", "批准套用"]):
             return self._decision(
                 text,

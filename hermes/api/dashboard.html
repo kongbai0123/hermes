@@ -744,6 +744,62 @@
             justify-content: space-between;
             background: var(--bg-panel);
         }
+        .preview-tools {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .markdown-preview-shell {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 220px minmax(0, 1fr);
+            min-height: 0;
+        }
+        .markdown-toc-sidebar {
+            border-right: 1px solid var(--border-subtle);
+            padding: 16px;
+            overflow-y: auto;
+            background: var(--bg-panel);
+        }
+        .markdown-toc-sidebar a {
+            display: block;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 12px;
+            padding: 5px 0;
+        }
+        .markdown-preview-panel {
+            padding: 24px;
+            overflow: auto;
+            line-height: 1.65;
+        }
+        .markdown-preview-panel h1,
+        .markdown-preview-panel h2,
+        .markdown-preview-panel h3 {
+            color: var(--accent);
+        }
+        .markdown-preview-panel table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+        }
+        .markdown-preview-panel th,
+        .markdown-preview-panel td {
+            border: 1px solid var(--border-subtle);
+            padding: 8px 10px;
+        }
+        .markdown-code {
+            background: #000;
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            padding: 14px;
+            overflow-x: auto;
+        }
+        .markdown-preview-panel mark {
+            background: rgba(214, 184, 79, 0.3);
+            color: var(--text-primary);
+        }
         /* Management Chain Nodes */
         .chain-node {
             display: flex;
@@ -983,7 +1039,12 @@
         <div id="file-preview-container" class="preview-overlay panel-hidden">
             <div class="preview-header">
                 <div style="font-size: 13px; font-weight: 600;" id="preview-filename">file.py</div>
-                <button class="control-btn" onclick="closeFilePreview()">Close</button>
+                <div class="preview-tools">
+                    <input class="toolbox-input" id="markdown-search-input" placeholder="Search in document" oninput="renderPreviewFileContent(this.value)" style="width: 180px; margin: 0;">
+                    <button class="control-btn" onclick="toggleMarkdownPreviewMode('preview')">Preview</button>
+                    <button class="control-btn" onclick="toggleMarkdownPreviewMode('raw')">Raw</button>
+                    <button class="control-btn" onclick="closeFilePreview()">Close</button>
+                </div>
             </div>
             <pre id="preview-content" class="preview-body"></pre>
         </div>
@@ -1101,6 +1162,7 @@
 
     <script src="static/api.js" defer></script>
     <script src="static/workspace.js" defer></script>
+    <script src="static/markdown_preview.js" defer></script>
     <script src="static/renderers.js" defer></script>
     <script src="static/management.js" defer></script>
     <script src="static/boot.js" defer></script>
@@ -1109,6 +1171,10 @@
         let state = {
             currentSession: "Hermes UI Redesign",
             workspace: ".",
+            previewFileMode: "preview",
+            previewFileData: null,
+            previewRefreshTimer: null,
+            lastPreviewSignature: "",
             provider: "ollama",
             model: "qwen3:14b",
             agentStatus: "IDLE",
@@ -1625,13 +1691,68 @@
                         if (!resp.ok || !payload.ok) throw new Error(describeApiError(resp, payload));
                         return payload;
                     })();
-                content.textContent = data.content;
+                state.previewFileData = data;
+                state.lastPreviewSignature = "";
+                state.previewFileMode = isMarkdownPath(data.path || path) ? "preview" : "raw";
+                renderPreviewFileContent();
+                schedulePreviewRefresh();
             } catch (e) {
                 content.textContent = `Error: ${e.message || 'Network error.'}`;
             }
         }
 
+        function schedulePreviewRefresh() {
+            if (state.previewRefreshTimer) clearInterval(state.previewRefreshTimer);
+            state.previewRefreshTimer = setInterval(autoRefreshPreview, 2500);
+        }
+
+        async function autoRefreshPreview() {
+            if (!state.previewFileData || !window.HermesApi?.statFile) return;
+            const stat = await window.HermesApi.statFile(state.previewFileData.path);
+            if (!state.lastPreviewSignature) {
+                state.lastPreviewSignature = stat.signature;
+                return;
+            }
+            if (stat.signature !== state.lastPreviewSignature) {
+                state.lastPreviewSignature = stat.signature;
+                const data = await window.HermesApi.readFile(state.previewFileData.path);
+                state.previewFileData = data;
+                renderPreviewFileContent(document.getElementById('markdown-search-input')?.value || '');
+            }
+        }
+
+        function isMarkdownPath(path) {
+            return /\.(md|markdown|txt|rst)$/i.test(String(path || ''));
+        }
+
+        function toggleMarkdownPreviewMode(mode) {
+            state.previewFileMode = mode;
+            renderPreviewFileContent();
+        }
+
+        function renderPreviewFileContent(query = '') {
+            const content = document.getElementById('preview-content');
+            const data = state.previewFileData;
+            if (!data) return;
+            const isMarkdown = isMarkdownPath(data.path);
+            if (!isMarkdown || state.previewFileMode === 'raw' || !window.HermesMarkdownPreview) {
+                content.className = 'preview-body';
+                content.textContent = data.content || '';
+                return;
+            }
+            const rendered = window.HermesMarkdownPreview.renderMarkdownPreview(data.content || '', { query });
+            content.className = 'markdown-preview-shell';
+            content.innerHTML = `
+                <aside class="markdown-toc-sidebar" id="markdown-toc-sidebar">
+                    ${rendered.toc.map(item => `<a href="#${item.id}" style="padding-left:${(item.level - 1) * 10}px">${escapeHtml(item.text)}</a>`).join('') || '<span class="mcp-empty">No headings</span>'}
+                </aside>
+                <article class="markdown-preview-panel" id="markdown-preview-panel">${rendered.html}</article>
+            `;
+        }
+
         function closeFilePreview() {
+            if (state.previewRefreshTimer) clearInterval(state.previewRefreshTimer);
+            state.previewRefreshTimer = null;
             document.getElementById('file-preview-container').classList.add('panel-hidden');
         }
 

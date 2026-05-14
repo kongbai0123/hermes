@@ -176,6 +176,19 @@ class ManagementOrchestrator:
                 )
             ]
 
+        if decision.intent == "leaf_preview":
+            path = (self._extract_file_paths(task) or ["README.md"])[0]
+            return [
+                ExecutionStep(
+                    id="S1",
+                    type="generate",
+                    tool="propose_leaf_inline_preview",
+                    args={"path": path},
+                    reason="Leaf 是 optional external viewer；只建立受治理提案，不直接執行。",
+                    expected="產生 leaf --inline 讀取預覽提案，後續執行需使用者批准。",
+                )
+            ]
+
         return []
 
     def _extract_file_path(self, task: str) -> str | None:
