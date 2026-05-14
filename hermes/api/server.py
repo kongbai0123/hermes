@@ -1,15 +1,38 @@
-from fastapi import FastAPI, HTTPException, Body
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Body, Query
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Dict, Any
+import os
+from pathlib import Path
+
 from hermes.core.runtime import HermesRuntime
 from hermes.core.llm_provider import MockLLMProvider, create_llm_provider
 from hermes.api.files import list_workspace_files, read_workspace_file, stat_workspace_file, status_from_result
 
 app = FastAPI(title="Hermes Agent OS API")
 
+# 啟用 CORS 支援，允許 Workbench 從不同來源 (如 Live Server) 呼叫 API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 獲取當前檔案所在目錄，確保路徑解析正確
+BASE_DIR = Path(__file__).resolve().parent
+
 # 全域 Runtime 實例
 runtime = HermesRuntime(llm_provider=MockLLMProvider(), mcp_config_path="hermes_mcp.json")
+
+# 掛載靜態檔案目錄 (用於 api.js, renderers.js 等)
+static_path = BASE_DIR / "static"
+if static_path.exists():
+    app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
+    app.mount("/api/static", StaticFiles(directory=str(static_path)), name="api_static")
 
 class TaskRequest(BaseModel):
     task: str
@@ -18,6 +41,7 @@ class TaskRequest(BaseModel):
     base_url: str = "http://localhost:11434"
     temperature: float = 0.7
     system_prompt: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 class PermissionUpdateRequest(BaseModel):
     permission: str
@@ -37,7 +61,11 @@ async def create_task(request: TaskRequest):
     runtime.configure_llm(llm_provider)
 
     # 目前仍是同步執行，但會回傳可顯示給使用者的結果。
-    result = runtime.execute_task(request.task, user_system_prompt=request.system_prompt)
+    result = runtime.execute_task(
+        request.task,
+        user_system_prompt=request.system_prompt,
+        task_metadata=request.metadata,
+    )
     return {"message": "Task completed", "task": request.task, "result": result}
 
 @app.get("/api/status")
@@ -158,11 +186,17 @@ async def read_file(path: str):
     result = read_workspace_file(runtime.constraints.workspace_root, path)
     return JSONResponse(result, status_code=status_from_result(result))
 
-@app.get("/files/stat")
 @app.get("/api/files/stat")
 async def stat_file(path: str):
     result = stat_workspace_file(runtime.constraints.workspace_root, path)
     return JSONResponse(result, status_code=status_from_result(result))
+
+@app.get("/")
+async def serve_dashboard():
+    dashboard_path = BASE_DIR / "dashboard.html"
+    if dashboard_path.exists():
+        return FileResponse(str(dashboard_path))
+    raise HTTPException(status_code=404, detail="dashboard.html not found in api directory")
 
 if __name__ == "__main__":
     import uvicorn

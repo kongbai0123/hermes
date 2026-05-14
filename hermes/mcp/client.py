@@ -97,7 +97,7 @@ class MCPStdioClient:
             try:
                 response = self._responses.get(timeout=timeout)
             except queue.Empty:
-                break
+                continue
             if response.get("id") != request_id:
                 continue
             if "error" in response:

@@ -52,13 +52,21 @@ class HermesRuntime:
     def _handle_state_change(self, old: AgentState, new: AgentState):
         self.monitor.add_trace(state=new.name, action="TRANSITION", data={"from": old.name})
 
-    def execute_task(self, task: str, user_system_prompt: Optional[str] = None, **llm_config) -> Dict[str, Any]:
+    def execute_task(
+        self,
+        task: str,
+        user_system_prompt: Optional[str] = None,
+        task_metadata: Optional[Dict[str, Any]] = None,
+        **llm_config,
+    ) -> Dict[str, Any]:
         self.is_running = True
         self.monitor.traces = list(self.bootstrap_traces)
         self.last_result = {"status": "RUNNING", "task": task, "response": "", "error": "", "trace": []}
         start_time = time.time()
         
         self.monitor.traces.append(RuntimeTrace("USER_CMD", f"Task: {task}", {"task": task}))
+        if task_metadata:
+            self.monitor.traces.append(RuntimeTrace("TASK_METADATA", "Task metadata received", dict(task_metadata)))
         self._record_mcp_inventory_trace()
 
         try:

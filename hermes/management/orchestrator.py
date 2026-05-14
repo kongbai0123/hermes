@@ -307,6 +307,13 @@ class ManagementOrchestrator:
 
     def _extract_shell_command(self, task: str) -> str:
         normalized = task.strip()
+        git_command = re.search(
+            r"(git\s+(?:clone|push(?:\s+(?:--force|-f))?|commit(?:\s+\S+)*|add(?:\s+\S+)*|tag(?:\s+\S+)*|rm(?:\s+\S+)*|reset\s+--hard(?:\s+\S+)*|clean\s+-[a-zA-Z]+(?:\s+\S+)*|rebase(?:\s+\S+)*|checkout\s+\.(?:\s+\S+)*|restore\s+\.(?:\s+\S+)*))",
+            normalized,
+            re.IGNORECASE,
+        )
+        if git_command:
+            return git_command.group(1)
         git_clone = re.search(r"(git\s+clone\s+\S+(?:\s+\S+)?)", normalized, re.IGNORECASE)
         if git_clone:
             return git_clone.group(1)

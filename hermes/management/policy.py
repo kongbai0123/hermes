@@ -221,15 +221,32 @@ class ManagementPolicy:
         return wants_modify and mentions_core
 
     def _is_governed_shell_request(self, lowered: str) -> bool:
-        return self._contains_any(lowered, [
-            "git clone",
-            "github clone",
-            "clone https://github.com",
-            "npm install",
-            "npm run",
-            "python -m",
-            "py -m",
-            "node ",
-            "ollama list",
-            "ollama show",
-        ])
+        patterns = [
+            r"\bgit\s+clone\b",
+            r"\bgit\s+push\b",
+            r"\bgit\s+commit\b",
+            r"\bgit\s+add\b",
+            r"\bgit\s+tag\b",
+            r"\bgit\s+rm\b",
+            r"\bgit\s+reset\s+--hard\b",
+            r"\bgit\s+clean\s+-[a-z]*f[a-z]*\b",
+            r"\bgit\s+rebase\b",
+            r"\bgit\s+checkout\s+\.",
+            r"\bgit\s+restore\s+\.",
+            r"github clone",
+            r"clone https://github\.com",
+            r"\bnpm\s+install\b",
+            r"\bnpm\s+run\b",
+            r"\bpython\s+-m\b",
+            r"\bpy\s+-m\b",
+            r"\bnode\s+",
+            r"\bollama\s+list\b",
+            r"\bollama\s+show\b",
+            r"推送.*github",
+            r"推上.*遠端",
+            r"推送.*遠端",
+            r"提交.*推送",
+            r"安裝.*套件",
+            r"下載.*安裝",
+        ]
+        return any(re.search(pattern, lowered) for pattern in patterns)

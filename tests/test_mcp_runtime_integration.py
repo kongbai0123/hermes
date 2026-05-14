@@ -80,6 +80,25 @@ class TestMCPRuntimeIntegration(unittest.TestCase):
         finally:
             runtime.shutdown()
 
+    def test_runtime_records_task_metadata_in_trace(self):
+        runtime = HermesRuntime(llm_provider=MockLLMProvider())
+        try:
+            result = runtime.execute_task(
+                "你好",
+                task_metadata={
+                    "source": "mcp",
+                    "client": "claude_code",
+                    "entrypoint": "hermes.mcp_server",
+                    "tool": "hermes.run_task",
+                },
+            )
+        finally:
+            runtime.shutdown()
+
+        metadata_trace = next(trace for trace in result["trace"] if trace["action"] == "TASK_METADATA")
+        self.assertEqual(metadata_trace["data"]["source"], "mcp")
+        self.assertEqual(metadata_trace["data"]["client"], "claude_code")
+
 
 if __name__ == "__main__":
     unittest.main()

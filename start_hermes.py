@@ -84,6 +84,7 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
             base_url = post_data.get("base_url", "http://localhost:11434")
             temperature = float(post_data.get("temperature", 0.7))
             system_prompt = post_data.get("system_prompt")
+            metadata = post_data.get("metadata")
             
             # 非同步模擬執行
             print(f"[Server] Received Task: {task}")
@@ -93,7 +94,7 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
                 base_url=base_url,
                 temperature=temperature
             ))
-            result = runtime.execute_task(task, user_system_prompt=system_prompt)
+            result = runtime.execute_task(task, user_system_prompt=system_prompt, task_metadata=metadata)
             
             self.send_response(200)
             self.send_header('Content-type', 'application/json; charset=utf-8')

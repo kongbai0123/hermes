@@ -230,6 +230,16 @@ class TestHermesCore(unittest.TestCase):
         self.assertIn("propose_shell_command", str(strategy["data"]))
         self.assertNotIn("execute_approved_shell", str(strategy["data"]))
 
+    def test_runtime_git_push_request_creates_proposal_without_hitting_llm(self):
+        runtime = HermesRuntime(llm_provider=MockLLMProvider())
+
+        result = runtime.execute_task("幫我 git push")
+
+        self.assertEqual(result["status"], "DONE")
+        strategy = next(trace for trace in result["trace"] if trace["action"] == "STRATEGY_PLAN")
+        self.assertIn("propose_shell_command", str(strategy["data"]))
+        self.assertNotIn("execute_approved_shell", str(strategy["data"]))
+
     def test_runtime_rejects_delete_before_tool_execution(self):
         runtime = HermesRuntime(llm_provider=MockLLMProvider())
 

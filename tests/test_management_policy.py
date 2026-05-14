@@ -79,6 +79,22 @@ class TestManagementPolicy(unittest.TestCase):
         self.assertTrue(decision.requires_tools)
         self.assertTrue(decision.requires_user_approval)
 
+    def test_git_push_is_classified_as_governed_operation(self):
+        for task in ["幫我 git push", "請幫我 git push --force", "推送到 GitHub"]:
+            decision = self.policy.classify_task(task)
+
+            self.assertEqual(decision.intent, "propose_shell_command")
+            self.assertEqual(decision.risk_level, "requires_user_approval")
+            self.assertTrue(decision.requires_tools)
+            self.assertTrue(decision.requires_user_approval)
+
+    def test_install_like_requests_are_not_general_chat(self):
+        for task in ["pip install requests", "npm install", "下載並安裝 GitHub 套件"]:
+            decision = self.policy.classify_task(task)
+
+            self.assertNotEqual(decision.intent, "general_chat")
+            self.assertIn(decision.risk_level, {"requires_user_approval", "reject"})
+
 
 if __name__ == "__main__":
     unittest.main()
