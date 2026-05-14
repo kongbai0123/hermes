@@ -3,11 +3,12 @@ import os
 from pathlib import Path
 from hermes.harness.constraints import ConstraintValidator
 from hermes.harness.executor import SafeExecutor
+from tests.support import test_workspace
 
 class TestV2Tools(unittest.TestCase):
     def setUp(self):
         # 建立測試環境
-        self.test_root = Path("e:/program/hermes/tests/v2_test_workspace").resolve()
+        self.test_root = test_workspace("v2_test_workspace").resolve()
         self.test_root.mkdir(parents=True, exist_ok=True)
         (self.test_root / "test_file.py").write_text("print('hermes_v2_secret')", encoding='utf-8')
         (self.test_root / "other.txt").write_text("nothing here", encoding='utf-8')

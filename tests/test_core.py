@@ -2,6 +2,7 @@ import unittest
 import os
 import sys
 from pathlib import Path
+from tests.support import repo_root, test_workspace
 
 # 將專案路徑加入 sys.path
 sys.path.append(str(Path(__file__).parent.parent))
@@ -117,7 +118,7 @@ class TestHermesCore(unittest.TestCase):
 
         self.assertTrue(hasattr(start_hermes, "main"))
         self.assertTrue(start_hermes.ReusableTCPServer.allow_reuse_address)
-        self.assertEqual(start_hermes.PROJECT_ROOT, Path("e:/program/hermes").resolve())
+        self.assertEqual(start_hermes.PROJECT_ROOT, repo_root())
         self.assertEqual(Path(start_hermes.DIRECTORY), start_hermes.PROJECT_ROOT / "hermes" / "api")
         handler_source = Path("start_hermes.py").read_text(encoding="utf-8")
         self.assertIn("/api/shell/pending", handler_source)
@@ -149,7 +150,7 @@ class TestHermesCore(unittest.TestCase):
         self.assertGreaterEqual(usage, 24)
 
     def test_runtime_read_workspace_confirms_files_without_following_file_instructions(self):
-        root = Path("e:/program/hermes/tests/runtime_read_workspace").resolve()
+        root = test_workspace("runtime_read_workspace").resolve()
         root.mkdir(parents=True, exist_ok=True)
         (root / "README.md").write_text("# Hermes\nLocal agent OS", encoding="utf-8")
         (root / "user_projects").mkdir(exist_ok=True)

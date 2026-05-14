@@ -2,14 +2,15 @@ import json
 import os
 from typing import List, Dict, Any
 from hermes.memory.base import Memory
+from hermes.utils.paths import optimization_file
 
 class SemanticMemory(Memory):
     """
     Session Search (情節記憶) & RAG: 儲存歷史對話與結構化知識。
     目前以本地 JSON 模擬向量檢索，未來可升級為 ChromaDB/FAISS。
     """
-    def __init__(self, storage_path: str = "e:/program/hermes/optimization/memory_semantic.json"):
-        self.storage_path = storage_path
+    def __init__(self, storage_path: str | None = None):
+        self.storage_path = storage_path or optimization_file("memory_semantic.json")
         self.data: List[Dict[str, Any]] = []
         self._load()
 
@@ -19,6 +20,7 @@ class SemanticMemory(Memory):
                 self.data = json.load(f)
 
     def _save(self):
+        os.makedirs(os.path.dirname(self.storage_path), exist_ok=True)
         with open(self.storage_path, 'w', encoding='utf-8') as f:
             json.dump(self.data, f, indent=4, ensure_ascii=False)
 
@@ -48,8 +50,8 @@ class UserModeling(Memory):
     """
     User Modeling (個性模型): 儲存用戶偏好、風格與習慣。
     """
-    def __init__(self, storage_path: str = "e:/program/hermes/optimization/user_model.json"):
-        self.storage_path = storage_path
+    def __init__(self, storage_path: str | None = None):
+        self.storage_path = storage_path or optimization_file("user_model.json")
         self.preferences: Dict[str, Any] = {}
         self._load()
 
@@ -59,6 +61,7 @@ class UserModeling(Memory):
                 self.preferences = json.load(f)
 
     def _save(self):
+        os.makedirs(os.path.dirname(self.storage_path), exist_ok=True)
         with open(self.storage_path, 'w', encoding='utf-8') as f:
             json.dump(self.preferences, f, indent=4, ensure_ascii=False)
 

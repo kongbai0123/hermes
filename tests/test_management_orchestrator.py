@@ -1,5 +1,6 @@
 import unittest
 from pathlib import Path
+from tests.support import test_workspace
 
 from hermes.harness.constraints import ConstraintValidator
 from hermes.harness.executor import SafeExecutor
@@ -11,7 +12,7 @@ from hermes.management.orchestrator import ManagementOrchestrator
 
 class TestManagementOrchestrator(unittest.TestCase):
     def setUp(self):
-        self.root = Path("e:/program/hermes/tests/management_workspace").resolve()
+        self.root = test_workspace("management_workspace").resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         (self.root / "README.md").write_text("Hermes management test", encoding="utf-8")
         (self.root / "user_projects").mkdir(exist_ok=True)

@@ -3,11 +3,12 @@ import os
 from pathlib import Path
 from hermes.harness.constraints import ConstraintValidator
 from hermes.harness.executor import SafeExecutor
+from tests.support import test_workspace
 
 class TestPatchFlow(unittest.TestCase):
     def setUp(self):
         # 建立測試沙盒
-        self.test_root = Path("e:/program/hermes/tests/patch_test_workspace").resolve()
+        self.test_root = test_workspace("patch_test_workspace").resolve()
         self.test_root.mkdir(parents=True, exist_ok=True)
         (self.test_root / "hello.py").write_text("print('old')", encoding='utf-8')
         

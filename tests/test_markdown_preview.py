@@ -111,3 +111,17 @@ class TestMarkdownReportTools(unittest.TestCase):
         self.assertEqual(plan.decision.risk_level, "requires_user_approval")
         self.assertEqual(plan.steps[0].tool, "propose_leaf_inline_preview")
         self.assertEqual(plan.steps[0].args["path"], "README.md")
+
+    def test_p4_managed_leaf_execution_audits_as_done_without_running_shell(self):
+        from hermes.harness.constraints import ConstraintValidator
+        from hermes.harness.executor import SafeExecutor
+        from hermes.harness.tools import ToolRegistry
+        from hermes.management.orchestrator import ManagementOrchestrator
+
+        registry = ToolRegistry(SafeExecutor(ConstraintValidator(workspace_root=str(Path.cwd()))))
+        orchestrator = ManagementOrchestrator(registry)
+        result = orchestrator.execute(orchestrator.plan("請用 Leaf preview README.md"))
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.audit.final_status, "DONE")
+        self.assertIn("Leaf external viewer gated", " ".join(result.audit.risk_notes))

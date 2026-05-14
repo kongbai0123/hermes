@@ -2,6 +2,7 @@ import sys
 import unittest
 import asyncio
 from pathlib import Path
+from tests.support import test_workspace
 
 from hermes.harness.constraints import ConstraintValidator
 from hermes.harness.executor import SafeExecutor
@@ -14,7 +15,7 @@ except ModuleNotFoundError:
 
 class TestGovernedShell(unittest.TestCase):
     def setUp(self):
-        self.root = Path("e:/program/hermes/tests/shell_workspace").resolve()
+        self.root = test_workspace("shell_workspace").resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         (self.root / "user_projects").mkdir(exist_ok=True)
         self.executor = SafeExecutor(ConstraintValidator(workspace_root=str(self.root)))

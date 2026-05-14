@@ -4,11 +4,12 @@ from pathlib import Path
 from hermes.harness.constraints import ConstraintValidator
 from hermes.harness.executor import SafeExecutor
 from hermes.core.types import ToolResult
+from tests.support import repo_root, test_workspace
 
 class TestSafeExecutor(unittest.TestCase):
     def setUp(self):
         # 建立測試工作區
-        self.test_root = Path("e:/program/hermes/tests/temp_workspace").resolve()
+        self.test_root = test_workspace("temp_workspace").resolve()
         self.test_root.mkdir(parents=True, exist_ok=True)
         (self.test_root / "test.txt").write_text("Hello Hermes", encoding='utf-8')
         (self.test_root / ".env").write_text("SECRET=123", encoding='utf-8')
@@ -23,7 +24,7 @@ class TestSafeExecutor(unittest.TestCase):
         self.assertEqual(result.content, "Hello Hermes")
 
     def test_explicit_workspace_root_takes_priority_over_environment(self):
-        os.environ["HERMES_WORKSPACE"] = str(Path("e:/program/hermes").resolve())
+        os.environ["HERMES_WORKSPACE"] = str(repo_root())
         try:
             constraints = ConstraintValidator(workspace_root=str(self.test_root))
             self.assertEqual(constraints.workspace_root, self.test_root)

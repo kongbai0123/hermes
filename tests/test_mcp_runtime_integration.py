@@ -74,6 +74,9 @@ class TestMCPRuntimeIntegration(unittest.TestCase):
             self.assertIsNotNone(runtime.mcp_gateway)
             result = runtime.execute_task("你好")
             self.assertEqual(result["status"], "DONE")
+            actions = [trace["action"] for trace in result["trace"]]
+            self.assertIn("MCP_CONFIG_LOADED", actions)
+            self.assertIn("MCP_SERVER_FAILED", actions)
         finally:
             runtime.shutdown()
 

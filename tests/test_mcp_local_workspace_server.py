@@ -2,6 +2,7 @@ import os
 import sys
 import unittest
 from pathlib import Path
+from tests.support import test_workspace
 
 from hermes.core.llm_provider import MockLLMProvider
 from hermes.core.runtime import HermesRuntime
@@ -10,7 +11,7 @@ from hermes.mcp.client import MCPStdioClient
 
 class TestMCPLocalWorkspaceServer(unittest.TestCase):
     def setUp(self):
-        self.root = Path("e:/program/hermes/tests/mcp_local_workspace").resolve()
+        self.root = test_workspace("mcp_local_workspace").resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         (self.root / "README.md").write_text("# MCP Workspace\nHermes MCP read works.", encoding="utf-8")
         (self.root / ".env").write_text("SECRET=blocked", encoding="utf-8")

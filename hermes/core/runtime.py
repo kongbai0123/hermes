@@ -41,6 +41,7 @@ class HermesRuntime:
         self.governance = GovernanceManager()
         self.memory = MemoryManager()
         self.skills = SkillRegistry()
+        self.bootstrap_traces = list(self.monitor.traces)
         
         self.is_running = False
         self.last_result = {"status": "IDLE", "task": "", "response": "", "error": "", "trace": []}
@@ -53,7 +54,7 @@ class HermesRuntime:
 
     def execute_task(self, task: str, user_system_prompt: Optional[str] = None, **llm_config) -> Dict[str, Any]:
         self.is_running = True
-        self.monitor.traces = []
+        self.monitor.traces = list(self.bootstrap_traces)
         self.last_result = {"status": "RUNNING", "task": task, "response": "", "error": "", "trace": []}
         start_time = time.time()
         
