@@ -137,7 +137,12 @@ class HermesRuntime:
                 else:
                     self.last_result.update({"status": "FAILED", "error": managed_result.error})
             else:
-                max_iter = llm_config.get('max_iterations', 5); self._run_autonomous_loop(task, user_system_prompt, max_iterations=max_iter)
+                max_iter = llm_config.get('max_iterations', 5)
+                self._run_autonomous_loop(
+                    task,
+                    user_system_prompt,
+                    max_iterations=max_iter,
+                )
             
             if self.last_result["status"] in {"DONE", "FAILED"}:
                 if self.last_result["status"] == "DONE":
