@@ -109,8 +109,7 @@ class HermesRuntime:
                     ]
                 }))
                 self.state_machine.transition_to(AgentState.EXECUTING)
-                if managed_plan.decision.requires_write and not managed_plan.decision.requires_user_approval:
-                    self.governance.grant_permission('filesystem_write')
+
                 managed_result = self._execute_managed_plan(managed_plan)
 
                 if managed_result.ok:
