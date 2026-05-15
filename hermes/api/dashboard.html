@@ -823,6 +823,9 @@
         .chain-node:last-child::after { display: none; }
         .chain-node.active { border-color: var(--accent); background: var(--accent-soft); }
         .chain-node.complete { border-color: var(--success); }
+        .chain-node.error { border-color: var(--danger); background: rgba(248, 113, 113, 0.08); }
+        .chain-node.error .node-icon { background: var(--danger); color: #fff; border-color: var(--danger); }
+        .chain-node.error .node-title { color: var(--danger); }
         
         .node-icon {
             width: 32px;
@@ -1891,9 +1894,12 @@
             // L1 Executive
             if (executive.intent) {
                 l1.classList.add('complete');
+                const isRejected = auditor.final_status === 'REJECTED';
+                if (isRejected) l1.classList.add('error');
+
                 const riskIcon = executive.risk_level === 'high' ? '🔴' : (executive.risk_level === 'medium' ? '🟡' : '🟢');
                 l1d.innerHTML = `
-                    <div style="font-weight:600; color:var(--text-primary); margin-bottom:2px;">Intent: ${executive.intent}</div>
+                    <div style="font-weight:600; color:${isRejected ? 'var(--danger)' : 'var(--text-primary)'}; margin-bottom:2px;">Intent: ${executive.intent}</div>
                     <div style="font-size:10px; color:var(--text-muted); display:flex; gap:8px;">
                         <span>Risk: ${riskIcon} ${executive.risk_level}</span>
                         <span>Write: ${executive.requires_write ? 'Yes' : 'No'}</span>
@@ -1934,20 +1940,26 @@
             const failCount = toolResults.length - successCount;
             
             if (toolCalls.length > 0) {
+                const lastResult = toolResults[toolResults.length - 1]?.data || {};
+                const isBlocked = (lastResult.summary === 'Governance Blocked' || (lastResult.error || '').includes('Governance Blocked'));
+                
+                if (failCount > 0) l3.classList.add('error');
+                else if (toolResults.length === toolCalls.length) l3.classList.add('complete');
+                else l3.classList.add('active');
+
                 const lastTool = toolCalls[toolCalls.length - 1].data?.tool || 'unknown';
                 l3d.innerHTML = `
-                    <div style="font-weight:600; color:var(--text-primary);">Execution: ${toolResults.length}/${toolCalls.length} done</div>
-                    <div style="font-size:10px; color:var(--text-muted); display:flex; gap:8px;">
+                    <div style="font-weight:600; color:${failCount > 0 ? 'var(--danger)' : 'var(--text-primary)'};">Execution: ${toolResults.length}/${toolCalls.length} done</div>
+                    <div style="font-size:10px; color:var(--text-muted); display:flex; gap:8px; flex-wrap:wrap;">
                         <span style="color:var(--success)">Pass: ${successCount}</span>
                         <span style="color:var(--danger)">Fail: ${failCount}</span>
                         <span>Last: ${lastTool}</span>
+                        ${isBlocked ? `<span style="color:var(--danger); font-weight:700;">[BLOCKED]</span>` : ''}
                     </div>
+                    ${isBlocked ? `<div style="font-size:9px; color:var(--danger); margin-top:2px;">Reason: ${lastResult.error || 'Access Denied'}</div>` : ''}
                 `;
-                if (toolResults.length === toolCalls.length && toolCalls.length > 0) {
-                    l3.classList.replace('active', 'complete');
+                if (l3.classList.contains('complete') || l3.classList.contains('error')) {
                     l4.classList.add('active');
-                } else {
-                    l3.classList.add('active');
                 }
             } else if (l2.classList.contains('complete')) {
                 l3d.textContent = 'Executing tools...';
@@ -1955,15 +1967,19 @@
 
             // L4 Auditor
             if (auditor.final_status) {
-                l3.classList.replace('active', 'complete');
-                l4.classList.add('complete');
+                l4.className = 'chain-node complete';
+                if (!auditor.verified) l4.classList.add('error');
+                
                 const verified = auditor.verified ? '✅ Verified' : '❌ Failed';
                 const failedCount = (auditor.failed_criteria || []).length;
+                const riskNotes = auditor.risk_notes ? `<div style="font-size:9px; color:var(--text-muted); margin-top:4px; font-style:italic;">Note: ${auditor.risk_notes}</div>` : '';
+                
                 l4d.innerHTML = `
                     <div style="font-weight:600; color:${auditor.verified ? 'var(--success)' : 'var(--danger)'}">${verified}</div>
                     <div style="font-size:10px; color:var(--text-muted);">Status: ${auditor.final_status} | Issues: ${failedCount}</div>
+                    ${riskNotes}
                 `;
-            } else if (l3.classList.contains('complete')) {
+            } else if (l3.classList.contains('complete') || l3.classList.contains('error')) {
                 l4d.textContent = 'Verifying results...';
             }
         }
