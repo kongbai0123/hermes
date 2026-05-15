@@ -1888,26 +1888,83 @@
             // Reset classes
             [l1, l2, l3, l4].forEach(n => { if(n) n.className = 'chain-node'; });
 
+            // L1 Executive
             if (executive.intent) {
                 l1.classList.add('complete');
-                l1d.textContent = `Intent: ${executive.intent}`;
+                const riskIcon = executive.risk_level === 'high' ? '🔴' : (executive.risk_level === 'medium' ? '🟡' : '🟢');
+                l1d.innerHTML = `
+                    <div style="font-weight:600; color:var(--text-primary); margin-bottom:2px;">Intent: ${executive.intent}</div>
+                    <div style="font-size:10px; color:var(--text-muted); display:flex; gap:8px;">
+                        <span>Risk: ${riskIcon} ${executive.risk_level}</span>
+                        <span>Write: ${executive.requires_write ? 'Yes' : 'No'}</span>
+                        <span>Approval: ${executive.requires_user_approval ? 'Yes' : 'No'}</span>
+                    </div>
+                `;
                 l2.classList.add('active');
+            } else {
+                l1d.textContent = 'Awaiting task...';
             }
+
+            // L2 Strategy
             if (strategy.steps) {
                 l2.classList.replace('active', 'complete');
-                l2d.textContent = `Plan: ${strategy.steps.length} steps prepared`;
+                const stepsSummary = strategy.steps.map(s => `<div style="font-size:10px;">• ${s.tool || s.type}</div>`).join('');
+                l2d.innerHTML = `
+                    <div style="font-weight:600; color:var(--text-primary); margin-bottom:2px;">Strategy: ${strategy.steps.length} steps</div>
+                    <div style="max-height:60px; overflow-y:auto; color:var(--text-muted);">${stepsSummary}</div>
+                `;
                 l3.classList.add('active');
+            } else if (logs.some(l => l.action === 'AGENT_LOOP')) {
+                // Handle Autonomous Loop
+                l2.classList.add('complete');
+                const iterations = logs.filter(l => l.action === 'AGENT_LOOP').length;
+                l2d.innerHTML = `
+                    <div style="font-weight:600; color:var(--text-primary);">Mode: Autonomous Loop</div>
+                    <div style="font-size:10px; color:var(--text-muted);">Iterations: ${iterations} (Observe/Plan/Exec)</div>
+                `;
+                l3.classList.add('active');
+            } else if (l1.classList.contains('complete')) {
+                l2d.textContent = 'Planning strategy...';
             }
+
+            // L3 Operator
+            const toolResults = logs.filter(l => l.action.includes('TOOL_RESULT'));
+            const toolCalls = logs.filter(l => l.action.includes('TOOL_CALL'));
+            const successCount = toolResults.filter(l => l.data?.ok || l.data?.result?.ok).length;
+            const failCount = toolResults.length - successCount;
             
-            const toolLogs = logs.filter(l => l.action.includes('TOOL'));
-            if (toolLogs.length > 0) {
-                l3d.textContent = `Tools: ${toolLogs.length} execution events`;
+            if (toolCalls.length > 0) {
+                const lastTool = toolCalls[toolCalls.length - 1].data?.tool || 'unknown';
+                l3d.innerHTML = `
+                    <div style="font-weight:600; color:var(--text-primary);">Execution: ${toolResults.length}/${toolCalls.length} done</div>
+                    <div style="font-size:10px; color:var(--text-muted); display:flex; gap:8px;">
+                        <span style="color:var(--success)">Pass: ${successCount}</span>
+                        <span style="color:var(--danger)">Fail: ${failCount}</span>
+                        <span>Last: ${lastTool}</span>
+                    </div>
+                `;
+                if (toolResults.length === toolCalls.length && toolCalls.length > 0) {
+                    l3.classList.replace('active', 'complete');
+                    l4.classList.add('active');
+                } else {
+                    l3.classList.add('active');
+                }
+            } else if (l2.classList.contains('complete')) {
+                l3d.textContent = 'Executing tools...';
             }
-            
+
+            // L4 Auditor
             if (auditor.final_status) {
                 l3.classList.replace('active', 'complete');
                 l4.classList.add('complete');
-                l4d.textContent = `Audit: ${auditor.final_status}`;
+                const verified = auditor.verified ? '✅ Verified' : '❌ Failed';
+                const failedCount = (auditor.failed_criteria || []).length;
+                l4d.innerHTML = `
+                    <div style="font-weight:600; color:${auditor.verified ? 'var(--success)' : 'var(--danger)'}">${verified}</div>
+                    <div style="font-size:10px; color:var(--text-muted);">Status: ${auditor.final_status} | Issues: ${failedCount}</div>
+                `;
+            } else if (l3.classList.contains('complete')) {
+                l4d.textContent = 'Verifying results...';
             }
         }
 
