@@ -33,12 +33,12 @@ class HermesRuntime:
         
         # 核心地基
         self.constraints = ConstraintValidator()
-        self.executor = SafeExecutor(self.constraints)
+        self.governance = GovernanceManager()
+        self.executor = SafeExecutor(self.constraints, governance=self.governance)
         self.tools = ToolRegistry(self.executor)
         self._initialize_mcp(mcp_config_path)
         self.planner = ToolPlanner(self.tools)
         self.management = ManagementOrchestrator(self.tools)
-        self.governance = GovernanceManager()
         self.memory = MemoryManager()
         self.skills = SkillRegistry()
         self.bootstrap_traces = list(self.monitor.traces)
@@ -109,6 +109,8 @@ class HermesRuntime:
                     ]
                 }))
                 self.state_machine.transition_to(AgentState.EXECUTING)
+                if managed_plan.decision.requires_write and not managed_plan.decision.requires_user_approval:
+                    self.governance.grant_permission('filesystem_write')
                 managed_result = self._execute_managed_plan(managed_plan)
 
                 if managed_result.ok:
@@ -136,7 +138,7 @@ class HermesRuntime:
                 else:
                     self.last_result.update({"status": "FAILED", "error": managed_result.error})
             else:
-                self._execute_llm_direct_or_single_tool(task, user_system_prompt)
+                max_iter = llm_config.get('max_iterations', 5); self._run_autonomous_loop(task, user_system_prompt, max_iterations=max_iter)
             
             if self.last_result["status"] in {"DONE", "FAILED"}:
                 if self.last_result["status"] == "DONE":
@@ -247,67 +249,89 @@ class HermesRuntime:
                 },
             )
 
-    def _execute_llm_direct_or_single_tool(self, task: str, user_system_prompt: Optional[str] = None):
-        tool_descriptions = self.tools.get_all_descriptions()
-        system_prompt = (
-            f"You are Hermes Agent OS. Mode: CONTROLLED_AGENT.\n"
-            "Default Language: Traditional Chinese (zh-Hant) when the user writes in Chinese.\n"
-            "You may execute registered tools when they match the user's request.\n"
-            "Never claim you cannot interact with the filesystem if a registered safe tool can perform the task.\n"
-            "Writable actions are restricted to safe registered tools and their workspace boundaries.\n"
-            f"Tools:\n{tool_descriptions}\n\n"
-            "If tool needed, return JSON:\n"
-            '{"tool": "name", "args": {}, "reason": "why"}\n'
-            "Otherwise, answer directly."
-        )
-        if user_system_prompt:
-            system_prompt = f"{system_prompt}\n\nUser system prompt:\n{user_system_prompt}"
-
-        plan_response = self.llm.completion(prompt=task, system_prompt=system_prompt)
-        self._record_usage(plan_response)
-        plan = self.planner.parse_output(plan_response["text"], allow_heuristic=False)
-        if not plan:
-            plan = self.planner.parse_output(task)
-
-        if not plan:
-            self.last_result.update({"status": "DONE", "response": plan_response["text"]})
-            return
-
-        self.monitor.traces.append(RuntimeTrace("TOOL_PLAN", f"Plan: {plan.tool}", {"tool": plan.tool, "args": plan.args, "reason": plan.reason}))
+    def _run_autonomous_loop(self, task: str, user_system_prompt: Optional[str] = None, max_iterations: int = 5):
+        """
+        Autonomous Agent Loop (V0.4-α): Plan -> Execute -> Observe -> Verify.
+        """
         self.state_machine.transition_to(AgentState.EXECUTING)
-        tool_spec = self.tools.get_tool(plan.tool)
-        if not tool_spec:
-            self.last_result.update({"status": "FAILED", "error": f"Tool {plan.tool} not found"})
-            return
-        if tool_spec.permission in {"write", "write_proposal", "shell"}:
-            self.last_result.update({
-                "status": "FAILED",
-                "error": f"Blocked unsafe fallback tool: {plan.tool}. Write-capable tools must be approved by ManagementPolicy."
-            })
-            return
+        observations = []
+        tool_descriptions = self.tools.get_all_descriptions()
+        
+        system_prompt = "You are Hermes Agent OS. Mode: AUTONOMOUS_LOOP." + chr(10)
+        system_prompt += "Default Language: Traditional Chinese (zh-Hant) when user writes in Chinese." + chr(10)
+        system_prompt += "Goal: Resolve the user task by using tools if necessary." + chr(10)
+        system_prompt += "Guidelines:" + chr(10)
+        system_prompt += "1. Use tools to gather information (read_file, list_files, grep_search)." + chr(10)
+        system_prompt += "2. If you have enough info, provide the final answer." + chr(10)
+        system_prompt += "3. If tool needed, return JSON:" + chr(10)
+        system_prompt += '{"thought": "reasoning", "tool": "name", "args": {}}' + chr(10)
+        system_prompt += "4. Writable actions (patch/shell) require explicit proposal tools." + chr(10)
+        system_prompt += "Available Tools:" + chr(10) + tool_descriptions
 
-        self.monitor.traces.append(RuntimeTrace("TOOL_CALL", f"Call: {plan.tool}", {"tool": plan.tool, "args": plan.args, "permission": tool_spec.permission}))
-        result: ToolResult = tool_spec.handler(**plan.args)
-        self.monitor.record_tool_call(result.ok)
-        self.monitor.traces.append(RuntimeTrace("TOOL_RESULT", result.summary, {
-            "ok": result.ok,
-            "tool": result.tool,
-            "summary": result.summary,
-            "content": result.content,
-            "error": result.error,
-            "metadata": result.metadata
-        }))
-
-        if not result.ok:
-            self.last_result.update({"status": "FAILED", "error": result.error})
-            return
-
-        self.state_machine.transition_to(AgentState.VERIFYING)
-        context_prompt = f"Task: {task}\nResult: {result.content}\nFinalize answer:"
-        final_system_prompt = "Answer based on the tool result. Use Traditional Chinese if the user writes Chinese."
         if user_system_prompt:
-            final_system_prompt = f"{final_system_prompt}\n\nUser system prompt:\n{user_system_prompt}"
-        final_resp = self.llm.completion(prompt=context_prompt, system_prompt=final_system_prompt)
+            system_prompt += chr(10) + chr(10) + "User system prompt:" + chr(10) + user_system_prompt
+
+        current_prompt = task
+        
+        for i in range(max_iterations):
+            self.monitor.add_trace("AGENT_LOOP", "Iteration " + str(i+1), {"iteration": i+1})
+            
+            # Incorporate observations into prompt
+            if observations:
+                obs_text = "Previous Observations:" + chr(10)
+                for idx, obs in enumerate(observations):
+                    obs_text += "Observation " + str(idx+1) + ":" + chr(10) + str(obs) + chr(10) + chr(10)
+                prompt_with_obs = task + chr(10) + chr(10) + obs_text + chr(10) + "What is your next action?"
+            else:
+                prompt_with_obs = task
+                
+            resp = self.llm.completion(prompt=prompt_with_obs, system_prompt=system_prompt)
+            self._record_usage(resp)
+            text = resp["text"]
+            
+            plan = self.planner.parse_output(text, allow_heuristic=True)
+            
+            if not plan:
+                # No tool call detected, assume this is the final answer
+                self.last_result.update({"status": "DONE", "response": text})
+                return
+
+            # Tool call detected
+            self.monitor.traces.append(RuntimeTrace("TOOL_PLAN", "Step " + str(i+1) + ": " + plan.tool, {"tool": plan.tool, "args": plan.args, "reason": plan.reason}))
+            
+            tool_spec = self.tools.get_tool(plan.tool)
+            if not tool_spec:
+                observations.append("Error: Tool " + plan.tool + " not found.")
+                continue
+                
+            # Permission check for autonomous loop (Read-only + Proposal + Generate + Test)
+            if tool_spec.permission not in {"read", "test", "write_proposal", "generate"}:
+                self.last_result.update({
+                    "status": "FAILED", 
+                    "error": "Blocked high-risk tool in autonomous loop: " + plan.tool + ". High-risk tools must be managed by Policy Orchestrator."
+                })
+                return
+
+            self.monitor.traces.append(RuntimeTrace("TOOL_CALL", "Call: " + plan.tool, {"tool": plan.tool, "args": plan.args}))
+            result: ToolResult = tool_spec.handler(**plan.args)
+            self.monitor.record_tool_call(result.ok)
+            
+            self.monitor.traces.append(RuntimeTrace("TOOL_RESULT", result.summary, {
+                "ok": result.ok,
+                "tool": result.tool,
+                "content": result.content,
+                "error": result.error
+            }))
+            
+            if result.ok:
+                observations.append("Tool " + plan.tool + " result: " + str(result.content))
+            else:
+                observations.append("Tool " + plan.tool + " failed: " + str(result.error))
+                
+        # If we reached max iterations
+        self.state_machine.transition_to(AgentState.VERIFYING)
+        final_prompt = "Task: " + task + chr(10) + "Observations: " + str(observations) + chr(10) + "Summarize final findings and answer the user."
+        final_resp = self.llm.completion(prompt=final_prompt, system_prompt="Provide final answer based on observations.")
         self._record_usage(final_resp)
         self.last_result.update({"status": "DONE", "response": final_resp["text"]})
 

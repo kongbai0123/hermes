@@ -193,7 +193,7 @@ class TestHermesCore(unittest.TestCase):
         runtime.execute_task("你好")
 
         self.assertTrue(provider.system_prompts)
-        self.assertIn("CONTROLLED_AGENT", provider.system_prompts[0])
+        self.assertIn("AUTONOMOUS_LOOP", provider.system_prompts[0])
         self.assertIn("create_project_workspace", provider.system_prompts[0])
         self.assertNotIn("Mode: READ_ONLY", provider.system_prompts[0])
 

@@ -16,8 +16,9 @@ class SafeExecutor:
     """
     安全執行器 V2.2: 具備 Patch 治理能力的 L3-α 執行環境。
     """
-    def __init__(self, constraints: ConstraintValidator):
+    def __init__(self, constraints: ConstraintValidator, governance: Optional[Any] = None):
         self.constraints = constraints
+        self.governance = governance
         self.max_read_chars = 12000
         self.approval_manager = ApprovalManager()
         self.diff_engine = DiffEngine()
@@ -500,6 +501,8 @@ h2 { margin: 0; font-size: clamp(28px, 4vw, 46px); line-height: 1.08; letter-spa
         """
         套用已授權的 Patch：執行實體寫入。
         """
+        if self.governance and not self.governance.is_authorized('filesystem_write'):
+            return ToolResult(ok=False, tool='apply_approved_patch', summary='Governance Blocked', error='Filesystem write is NOT authorized by GovernanceManager.')
         if not self.approval_manager.validate(patch_id, approval_token):
             return ToolResult(ok=False, tool="apply_approved_patch", summary="Unauthorized", error="Invalid or expired token.")
         
@@ -554,6 +557,8 @@ h2 { margin: 0; font-size: clamp(28px, 4vw, 46px); line-height: 1.08; letter-spa
         return self.shell_executor.propose(command=command, reason=reason, cwd=cwd)
 
     def execute_approved_shell(self, proposal_id: str, approval_token: str, timeout_seconds: int = 120) -> ToolResult:
+        if self.governance and not self.governance.is_authorized('shell_execute'):
+            return ToolResult(ok=False, tool='execute_approved_shell', summary='Governance Blocked', error='Shell execution is NOT authorized by GovernanceManager.')
         return self.shell_executor.execute(
             proposal_id=proposal_id,
             approval_token=approval_token,
