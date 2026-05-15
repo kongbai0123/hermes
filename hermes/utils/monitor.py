@@ -7,6 +7,13 @@ from hermes.core.types import RuntimeTrace
 
 class Monitor:
     def __init__(self):
+        self._initial_metrics = {
+            "token_usage": {"input": 0, "output": 0, "total": 0},
+            "latency": [],
+            "errors": [],
+            "tool_calls": 0,
+            "success_rate": 0.0
+        }
         self.metrics = {
             "token_usage": {"input": 0, "output": 0, "total": 0},
             "latency": [],
@@ -35,6 +42,21 @@ class Monitor:
             "context": context,
             "timestamp": time.time()
         })
+
+    def record_tool_call(self, ok: bool):
+        self.metrics["tool_calls"] += 1
+        if not ok:
+            self.record_error("tool_call", "Tool call failed")
+
+    def reset(self):
+        self.metrics = {
+            "token_usage": {"input": 0, "output": 0, "total": 0},
+            "latency": [],
+            "errors": [],
+            "tool_calls": 0,
+            "success_rate": 0.0
+        }
+        self.traces = []
 
     def add_trace(self, state: str, action: str, data: Any = None):
         # 為了向後相容，保留字典格式的 add_trace

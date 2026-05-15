@@ -1,5 +1,6 @@
 from hermes.core.runtime import HermesRuntime
 from hermes.core.llm_provider import MockLLMProvider, OllamaProvider
+from hermes.utils.paths import optimization_file
 import json
 
 def main():
@@ -19,7 +20,7 @@ def main():
     print(json.dumps(status, indent=4, ensure_ascii=False))
     
     # 導出執行軌跡
-    trace_path = "e:/program/hermes/optimization/last_execution_trace.json"
+    trace_path = optimization_file("last_execution_trace.json")
     runtime.monitor.export_traces(trace_path)
     print(f"\n[Info] Execution trace exported to: {trace_path}")
 

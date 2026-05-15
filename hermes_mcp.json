@@ -1,0 +1,21 @@
+{
+  "servers": [
+    {
+      "name": "local_workspace",
+      "transport": "stdio",
+      "command": "python",
+      "args": ["-m", "hermes.mcp.servers.local_workspace"],
+      "enabled": true,
+      "default_permission": "read",
+      "allowed_tools": ["list_files", "read_file", "search_files"],
+      "denied_tools": ["write_file", "delete_file", "move_file", "run_command"]
+    }
+  ],
+  "security": {
+    "unknown_tools_default": "blocked",
+    "write_tools_require_approval": true,
+    "shell_tools_enabled": false,
+    "network_mutation_requires_approval": true,
+    "trace_all_mcp_calls": true
+  }
+}

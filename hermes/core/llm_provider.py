@@ -60,7 +60,7 @@ class ClaudeProvider(LLMProvider):
 class MockLLMProvider(LLMProvider):
     def completion(self, prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
         return {
-            "text": f"[MOCK] This is a simulated response for: {prompt}",
+            "text": f"[MOCK_FLOW_ONLY] 這是流程測試回覆，不是真實模型回答。原始指令：{prompt}",
             "usage": {"input": 10, "output": 20, "total": 30},
             "raw": {}
         }

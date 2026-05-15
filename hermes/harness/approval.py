@@ -34,6 +34,8 @@ class ApprovalManager:
     def validate(self, patch_id: str, token: str) -> bool:
         if token not in self.tokens:
             return False
+        if patch_id not in self.pending_patches:
+            return False
         
         record = self.tokens[token]
         if record["patch_id"] != patch_id:
@@ -41,9 +43,21 @@ class ApprovalManager:
             
         if time.time() > record["expires_at"]:
             return False
+
+        proposal = self.pending_patches[patch_id]
+        if record.get("patch_hash") != self._hash_proposal(proposal):
+            return False
             
         return True
 
     def _hash_proposal(self, proposal: PatchProposal) -> str:
-        data = f"{proposal.id}-{len(proposal.changes)}"
+        parts = [proposal.id, proposal.task_id]
+        for change in proposal.changes:
+            parts.extend([
+                change.path,
+                change.operation,
+                change.before_hash or "",
+                change.replacement or "",
+            ])
+        data = "|".join(parts)
         return hashlib.sha256(data.encode()).hexdigest()

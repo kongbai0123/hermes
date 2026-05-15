@@ -42,5 +42,39 @@ class TestToolPlanner(unittest.TestCase):
         self.assertEqual(plan.tool, "list_files")
         self.assertEqual(plan.args["path"], ".")
 
+    def test_parse_design_generation_json_preserves_goal(self):
+        output = '{"tool": "generate_design_artifact", "args": {"goal": "幫我設計一個咖啡店網站"}}'
+        plan = self.planner.parse_output(output)
+        self.assertIsNotNone(plan)
+        self.assertEqual(plan.tool, "generate_design_artifact")
+        self.assertEqual(plan.args["goal"], "幫我設計一個咖啡店網站")
+
+    def test_heuristic_fallback_design_generation(self):
+        output = '幫我製作一個簡潔的網站設計方案'
+        plan = self.planner.parse_output(output)
+        self.assertIsNotNone(plan)
+        self.assertEqual(plan.tool, "generate_design_artifact")
+        self.assertIn("網站設計方案", plan.args["goal"])
+
+    def test_plain_test_word_does_not_trigger_run_tests(self):
+        output = '你好，這是 UI 模型切換測試。'
+        plan = self.planner.parse_output(output)
+        self.assertIsNone(plan)
+
+    def test_explicit_run_test_intent_triggers_run_tests(self):
+        output = '請幫我執行測試'
+        plan = self.planner.parse_output(output)
+        self.assertIsNotNone(plan)
+        self.assertEqual(plan.tool, "run_tests")
+
+    def test_heuristic_create_workspace_intent_triggers_project_tool(self):
+        output = '請在不動到 hermes 原始碼的前提下，建立一個資料夾並製作網頁設計'
+        plan = self.planner.parse_output(output)
+
+        self.assertIsNotNone(plan)
+        self.assertEqual(plan.tool, "create_project_workspace")
+        self.assertEqual(plan.args["name"], "generated-project")
+        self.assertIn("網頁設計", plan.args["brief"])
+
 if __name__ == '__main__':
     unittest.main()

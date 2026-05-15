@@ -7,7 +7,7 @@ import time
 class FileChange:
     """單一檔案的原子變更描述"""
     path: str
-    operation: Literal["modify", "create", "delete"]
+    operation: Literal["modify", "create"]
     reason: str
     before_hash: Optional[str] = None
     original: Optional[str] = None

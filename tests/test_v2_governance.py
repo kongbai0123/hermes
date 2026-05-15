@@ -4,10 +4,11 @@ from hermes.harness.constraints import ConstraintValidator
 from hermes.harness.patch import PatchProposal, FileChange
 from hermes.harness.diff_engine import DiffEngine
 from hermes.harness.approval import ApprovalManager
+from tests.support import repo_root
 
 class TestGovernance(unittest.TestCase):
     def setUp(self):
-        self.workspace = Path("e:/program/hermes").resolve()
+        self.workspace = repo_root()
         self.constraints = ConstraintValidator(workspace_root=str(self.workspace))
 
     def test_strict_path_boundary(self):

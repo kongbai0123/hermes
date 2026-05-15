@@ -2,14 +2,15 @@ import json
 import os
 from typing import List, Dict, Any, Optional
 from hermes.memory.base import Memory
+from hermes.utils.paths import optimization_file
 
 class ProceduralMemory(Memory):
     """
     Process Memory (技能記憶): 儲存已固化的技能定義與其執行範例。
     這讓 Agent 知道「如何」執行特定複雜任務。
     """
-    def __init__(self, storage_path: str = "e:/program/hermes/optimization/memory_procedural.json"):
-        self.storage_path = storage_path
+    def __init__(self, storage_path: str | None = None):
+        self.storage_path = storage_path or optimization_file("memory_procedural.json")
         self.skills_data: Dict[str, Any] = {}
         self._load()
 
@@ -19,6 +20,7 @@ class ProceduralMemory(Memory):
                 self.skills_data = json.load(f)
 
     def _save(self):
+        os.makedirs(os.path.dirname(self.storage_path), exist_ok=True)
         with open(self.storage_path, 'w', encoding='utf-8') as f:
             json.dump(self.skills_data, f, indent=4, ensure_ascii=False)
 

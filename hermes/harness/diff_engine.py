@@ -11,9 +11,6 @@ class DiffEngine:
         if change.operation == "create":
             return f"--- /dev/null\n+++ {change.path}\n@@ -0,0 +1,1 @@\n+{change.replacement}"
         
-        if change.operation == "delete":
-            return f"--- {change.path}\n+++ /dev/null\n"
-            
         if change.operation == "modify":
             original_lines = (change.original or "").splitlines(keepends=True)
             replacement_lines = (change.replacement or "").splitlines(keepends=True)
