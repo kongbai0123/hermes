@@ -297,6 +297,7 @@
             grid-area: main;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
             background: var(--bg-app);
             border-right: 1px solid var(--border-subtle);
             position: relative;
@@ -347,6 +348,7 @@
             flex-direction: column;
             gap: 32px;
             min-height: 0;
+            scroll-behavior: smooth;
         }
         .agent-progress {
             border-left: 2px solid var(--accent);
@@ -389,7 +391,9 @@
         /* Composer */
         .composer-area {
             padding: 0 24px 22px 24px;
-            background: linear-gradient(to top, var(--bg-app) 80%, transparent);
+            background: var(--bg-app);
+            border-top: 1px solid var(--border-subtle);
+            flex-shrink: 0;
         }
         .composer-container {
             background: var(--bg-panel);
@@ -490,6 +494,7 @@
             background: var(--bg-panel);
             display: flex;
             flex-direction: column;
+            overflow: hidden;
             min-width: 0;
         }
         .workspace-tabs {
@@ -557,9 +562,8 @@
         .reply-label { font-size: 10px; font-weight: 800; color: var(--accent); letter-spacing: 0.05em; }
         .reply-body { font-size: 14px; line-height: 1.6; color: var(--text-primary); }
         .agent-reply-body {
-            max-height: 56vh;
-            overflow-y: auto;
-            scrollbar-gutter: stable;
+            /* Remove max-height to allow global scroll as per user request */
+            overflow-y: visible;
         }
         
         .tool-card {
@@ -594,9 +598,8 @@
         }
         .trace-timeline,
         .tool-result-preview {
-            max-height: 48vh;
-            overflow-y: auto;
-            scrollbar-gutter: stable;
+            /* Use natural height to allow parent scroll */
+            overflow-y: visible;
         }
         .detail-tabs {
             display: flex;
@@ -988,6 +991,7 @@
                 <div class="header-meta">
                     <span id="meta-workspace">Workspace: .</span>
                     <span id="meta-model">Model: qwen3:14b</span>
+                    <span id="provider-health" style="font-size: 10px; opacity: 0.8;"></span>
                 </div>
             </div>
             <div class="status-indicator" id="agent-status">
