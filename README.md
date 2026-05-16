@@ -44,12 +44,12 @@ Hermes 目前已具備穩定的本地代理運作核心，支援以下能力：
 - **自主循環**: 可進行多輪工具觀察與回饋，具備 `max_iterations` 截斷防止無限循環。
 - **治理診斷面板**: 右側 DECISION 面板可顯示 L1-L4 的即時治理鏈狀態與執行風險。
 - **受控寫入流程**: 已實作 `propose_patch` 與審核 API，寫入操作需經過 User Approval 與 Governance Gate。
-- **高覆蓋率測試**: 143+ 行為測試確保安全邊界穩固。
+- **核心安全測試**: 完整行為測試覆蓋核心安全邊界。
 
 ### V0.5 規劃：產品級治理體驗 (In Progress)
 - [x] **寫入意圖分類修正**: 已解鎖「MCP + 生成」組合任務，確保正確導向受管寫入路徑 (Managed Write Path)。
 - [ ] **審核流程產品化**: 完善 Patch 與 Shell 的審核 UI/API 閉環。
-- [ ] **Scoped 權限授權**: 從全域權限轉向基於任務/時間的臨時授權。
+- [x] **Scoped 權限授權**: Patch approval 已支援 patch_id scoped filesystem_write grant 與 TTL；後續將補 Dashboard 顯示與 scoped-only enforcement。
 - [ ] **Trace Schema 標準化**: 穩定診斷資料格式，提升可觀測性。
 - [ ] **README / Demo 補完**: 提供完整的安裝指南與 Demo 任務說明。
 
