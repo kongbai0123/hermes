@@ -6,11 +6,18 @@ import subprocess
 from urllib.request import urlopen, Request
 from urllib.error import HTTPError
 
+import socket
+
+def get_free_port():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        return s.getsockname()[1]
+
 class TestPatchHistoryAPI(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # 啟動伺服器，開啟測試模式
-        cls.port = 8082
+        # 啟動伺服器，開啟測試模式 (動態埠)
+        cls.port = get_free_port()
         cls.server_process = subprocess.Popen(
             ["python", "start_hermes.py"],
             stdout=subprocess.PIPE,
