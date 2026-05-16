@@ -90,12 +90,25 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(data)
         elif route == "/api/patch/pending":
             patches = runtime.executor.approval_manager.pending_patches
-            data = [
-                {
+            # 獲取當前授權狀態以便合併顯示
+            grants = {g.scope_id: g for g in runtime.governance.scoped_grants if g.scope_type == "patch"}
+            
+            data = []
+            for patch in patches.values():
+                if patch.status != "pending":
+                    continue
+                
+                data.append({
                     "id": patch.id,
-                    "task_id": patch.task_id,
+                    "path": patch.path,
+                    "reason": patch.reason,
                     "status": patch.status,
                     "created_at": patch.timestamp if hasattr(patch, 'timestamp') else "",
+                    "grant": {
+                        "is_authorized": patch.id in grants,
+                        "expires_at": grants[patch.id].expires_at if patch.id in grants else None,
+                        "granted_by": grants[patch.id].granted_by if patch.id in grants else None
+                    } if patch.id in grants else None,
                     "changes": [
                         {
                             "path": change.path,
@@ -106,10 +119,7 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
                         }
                         for change in patch.changes
                     ],
-                }
-                for patch in patches.values()
-                if patch.status == "pending"
-            ]
+                })
             self._send_json(data)
         elif route == "/api/providers/health":
             base_url = query.get("base_url", ["http://localhost:11434"])[0]
@@ -236,6 +246,17 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
                         "ttl_seconds": 60
                     }
                 })
+            else:
+                self._send_json({"error": "Patch not found"}, status=404)
+
+        elif route.startswith("/api/patch/reject/"):
+            patch_id = route.split("/")[-1]
+            if patch_id in runtime.executor.approval_manager.pending_patches:
+                # 撤銷相關授權
+                runtime.governance.revoke_scoped_permission("filesystem_write", "patch", patch_id)
+                # 從 pending 移除
+                runtime.executor.approval_manager.pending_patches.pop(patch_id)
+                self._send_json({"patch_id": patch_id, "status": "rejected"})
             else:
                 self._send_json({"error": "Patch not found"}, status=404)
 
