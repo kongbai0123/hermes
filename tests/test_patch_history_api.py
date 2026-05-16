@@ -1,0 +1,87 @@
+import unittest
+import json
+import os
+import time
+import subprocess
+from urllib.request import urlopen, Request
+from urllib.error import HTTPError
+
+class TestPatchHistoryAPI(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # 啟動伺服器，開啟測試模式
+        cls.port = 8082
+        cls.server_process = subprocess.Popen(
+            ["python", "start_hermes.py"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env={**os.environ, "HERMES_PORT": str(cls.port), "HERMES_TEST_MODE": "1"}
+        )
+        time.sleep(2) # 等待啟動
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls.server_process:
+            cls.server_process.terminate()
+            cls.server_process.wait()
+
+    def _inject_patch(self, task_id="test-task", status="pending", changes=None):
+        if changes is None:
+            changes = [{"path": "test.py", "operation": "modify", "reason": "test"}]
+        
+        url = f"http://localhost:{self.port}/api/test/inject_patch"
+        req = Request(url, data=json.dumps({"task_id": task_id, "status": status, "changes": changes}).encode('utf-8'), method='POST')
+        req.add_header('Content-Type', 'application/json')
+        with urlopen(req) as resp:
+            return json.loads(resp.read().decode('utf-8'))["patch_id"]
+
+    def test_patch_lifecycle_and_history(self):
+        # 1. 注入 Pending Patch
+        pid_pending = self._inject_patch(task_id="pending-task")
+        
+        # 檢查 /api/patch/pending
+        with urlopen(f"http://localhost:{self.port}/api/patch/pending") as resp:
+            pending_list = json.loads(resp.read().decode('utf-8'))
+            self.assertTrue(any(p["id"] == pid_pending for p in pending_list))
+        
+        # 檢查 /api/patch/history (不應存在)
+        with urlopen(f"http://localhost:{self.port}/api/patch/history") as resp:
+            history_list = json.loads(resp.read().decode('utf-8'))
+            self.assertFalse(any(p["id"] == pid_pending for p in history_list))
+
+        # 2. 注入並 Reject Patch
+        pid_reject = self._inject_patch(task_id="reject-task")
+        # 執行 Reject
+        req = Request(f"http://localhost:{self.port}/api/patch/reject/{pid_reject}", method='POST')
+        with urlopen(req) as resp:
+            self.assertEqual(resp.status, 200)
+            data = json.loads(resp.read().decode('utf-8'))
+            self.assertEqual(data["status"], "rejected")
+
+        # 檢查 /api/patch/pending (應移除)
+        with urlopen(f"http://localhost:{self.port}/api/patch/pending") as resp:
+            pending_list = json.loads(resp.read().decode('utf-8'))
+            self.assertFalse(any(p["id"] == pid_reject for p in pending_list))
+
+        # 檢查 /api/patch/history (應出現且為 rejected)
+        with urlopen(f"http://localhost:{self.port}/api/patch/history") as resp:
+            history_list = json.loads(resp.read().decode('utf-8'))
+            rejected_entry = next((p for p in history_list if p["id"] == pid_reject), None)
+            self.assertIsNotNone(rejected_entry)
+            self.assertEqual(rejected_entry["status"], "rejected")
+
+        # 3. 測試 Approved 不應出現在 History (剛才加固的語意)
+        pid_approve = self._inject_patch(task_id="approve-task")
+        # 執行 Approve
+        req = Request(f"http://localhost:{self.port}/api/patch/approve/{pid_approve}", method='POST')
+        with urlopen(req) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            self.assertIn("token", data)
+        
+        # 檢查 /api/patch/history (不應出現 approved，因為非終態)
+        with urlopen(f"http://localhost:{self.port}/api/patch/history") as resp:
+            history_list = json.loads(resp.read().decode('utf-8'))
+            self.assertFalse(any(p["id"] == pid_approve for p in history_list))
+
+if __name__ == "__main__":
+    unittest.main()

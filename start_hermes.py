@@ -13,8 +13,13 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 os.environ.setdefault("HERMES_WORKSPACE", str(PROJECT_ROOT))
 DIRECTORY = str(PROJECT_ROOT / "hermes" / "api")
 
-# 初始化 Hermes Runtime
-runtime = HermesRuntime(llm_provider=MockLLMProvider(), mcp_config_path=str(PROJECT_ROOT / "hermes_mcp.json"))
+# 初始化 Hermes Runtime (封裝以利測試)
+_runtime = None
+def get_runtime():
+    global _runtime
+    if _runtime is None:
+        _runtime = HermesRuntime(llm_provider=MockLLMProvider(), mcp_config_path=str(PROJECT_ROOT / "hermes_mcp.json"))
+    return _runtime
 
 class ReusableTCPServer(socketserver.TCPServer):
     allow_reuse_address = True
@@ -60,20 +65,20 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
         query = parse_qs(parsed.query)
 
         if route == "/api/status":
-            self._send_json(runtime.get_status())
+            self._send_json(get_runtime().get_status())
         elif route == "/api/logs":
-            self._send_json(runtime.monitor.get_serializable_traces())
+            self._send_json(get_runtime().monitor.get_serializable_traces())
         elif route in ("/api/files/list", "/files/list"):
-            result = list_workspace_files(runtime.constraints.workspace_root, query.get("path", ["."])[0])
+            result = list_workspace_files(get_runtime().constraints.workspace_root, query.get("path", ["."])[0])
             self._send_json(result, status_from_result(result))
         elif route in ("/api/files/read", "/files/read"):
-            result = read_workspace_file(runtime.constraints.workspace_root, query.get("path", [""])[0])
+            result = read_workspace_file(get_runtime().constraints.workspace_root, query.get("path", [""])[0])
             self._send_json(result, status_from_result(result))
         elif route in ("/api/files/stat", "/files/stat"):
-            result = stat_workspace_file(runtime.constraints.workspace_root, query.get("path", [""])[0])
+            result = stat_workspace_file(get_runtime().constraints.workspace_root, query.get("path", [""])[0])
             self._send_json(result, status_from_result(result))
         elif route == "/api/shell/pending":
-            actions = runtime.executor.shell_approval_manager.pending_actions
+            actions = get_runtime().executor.shell_approval_manager.pending_actions
             data = [
                 {
                     "id": proposal.id,
@@ -89,9 +94,9 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
             ]
             self._send_json(data)
         elif route == "/api/patch/pending":
-            patches = runtime.executor.approval_manager.pending_patches
+            patches = get_runtime().executor.approval_manager.pending_patches
             # 獲取當前授權狀態以便合併顯示
-            grants = {g.scope_id: g for g in runtime.governance.scoped_grants if g.scope_type == "patch"}
+            grants = {g.scope_id: g for g in get_runtime().governance.scoped_grants if g.scope_type == "patch"}
             
             data = []
             for patch in patches.values():
@@ -122,10 +127,11 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
                 })
             self._send_json(data)
         elif route == "/api/patch/history":
-            patches = runtime.executor.approval_manager.pending_patches
+            patches = get_runtime().executor.approval_manager.pending_patches
             data = []
             for patch in patches.values():
-                if patch.status == "pending":
+                # 僅包含最終狀態 (applied, rejected, failed)
+                if patch.status not in ["applied", "rejected", "failed"]:
                     continue
                 
                 data.append({
@@ -158,9 +164,9 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
             })
         elif route == "/api/governance":
             data = {
-                "budget": runtime.governance.token_budget,
-                "consumed": runtime.governance.consumed_tokens,
-                "permissions": runtime.governance.permissions,
+                "budget": get_runtime().governance.token_budget,
+                "consumed": get_runtime().governance.consumed_tokens,
+                "permissions": get_runtime().governance.permissions,
                 "scoped_grants": [
                     {
                         "permission": g.permission,
@@ -169,7 +175,7 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
                         "expires_at": g.expires_at,
                         "granted_by": g.granted_by
                     }
-                    for g in runtime.governance.scoped_grants
+                    for g in get_runtime().governance.scoped_grants
                 ]
             }
             self._send_json(data)
@@ -201,13 +207,13 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
             
             print(f"[Server] Received Task: {task}")
             try:
-                runtime.configure_llm(create_llm_provider(
+                get_runtime().configure_llm(create_llm_provider(
                     provider=provider,
                     model=model,
                     base_url=base_url,
                     temperature=temperature
                 ))
-                result = runtime.execute_task(task, user_system_prompt=system_prompt, task_metadata=metadata)
+                result = get_runtime().execute_task(task, user_system_prompt=system_prompt, task_metadata=metadata)
                 self._send_json({
                     "message": "Task completed",
                     "task": task,
@@ -216,12 +222,24 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 print(f"[Error] Task Execution Failed: {str(e)}")
                 self._send_json({"detail": str(e)}, status=500)
+        
+        elif os.getenv("HERMES_TEST_MODE") == "1" and route == "/api/test/inject_patch":
+            from hermes.harness.patch import PatchProposal, FileChange
+            content_length = int(self.headers['Content-Length'])
+            post_data = json.loads(self.rfile.read(content_length))
+            patch = PatchProposal(
+                task_id=post_data.get("task_id", "test-task"),
+                status=post_data.get("status", "pending"),
+                changes=[FileChange(**c) for c in post_data.get("changes", [])]
+            )
+            get_runtime().executor.approval_manager.register_proposal(patch)
+            self._send_json({"ok": True, "patch_id": patch.id})
         elif route == "/api/metrics/reset":
-            runtime.monitor.reset()
-            self._send_json(runtime.get_status())
+            get_runtime().monitor.reset()
+            self._send_json(get_runtime().get_status())
         elif route.startswith("/api/shell/approve/"):
             proposal_id = route.rsplit("/", 1)[-1]
-            token = runtime.executor.shell_approval_manager.approve(proposal_id)
+            token = get_runtime().executor.shell_approval_manager.approve(proposal_id)
             if not token:
                 self._send_json({"detail": "Shell proposal ID not found or invalid."}, status=404)
                 return
@@ -231,7 +249,7 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
             post_data = json.loads(self.rfile.read(content_length))
             proposal_id = post_data.get("proposal_id", "")
             token = post_data.get("token", "")
-            result = runtime.executor.execute_approved_shell(proposal_id=proposal_id, approval_token=token)
+            result = get_runtime().executor.execute_approved_shell(proposal_id=proposal_id, approval_token=token)
             if not result.ok:
                 self._send_json({"detail": result.error}, status=403)
                 return
@@ -245,9 +263,9 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
             })
         elif route.startswith("/api/patch/approve/"):
             patch_id = route.split("/")[-1]
-            token = runtime.executor.approval_manager.approve(patch_id)
+            token = get_runtime().executor.approval_manager.approve(patch_id)
             if token:
-                runtime.governance.grant_scoped_permission(
+                get_runtime().governance.grant_scoped_permission(
                     "filesystem_write",
                     scope_type="patch",
                     scope_id=patch_id,
@@ -269,10 +287,10 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
 
         elif route.startswith("/api/patch/reject/"):
             patch_id = route.split("/")[-1]
-            patch = runtime.executor.approval_manager.pending_patches.get(patch_id)
+            patch = get_runtime().executor.approval_manager.pending_patches.get(patch_id)
             if patch:
                 # 撤銷相關授權
-                runtime.governance.revoke_scoped_permission("filesystem_write", "patch", patch_id)
+                get_runtime().governance.revoke_scoped_permission("filesystem_write", "patch", patch_id)
                 # 標記為 rejected (保留在歷史中)
                 patch.status = "rejected"
                 self._send_json({"patch_id": patch_id, "status": "rejected"})
@@ -287,7 +305,7 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
             token = params.get("token")
             
             try:
-                result = runtime.executor.apply_approved_patch(patch_id, token)
+                result = get_runtime().executor.apply_approved_patch(patch_id, token)
                 if result.ok:
                     self._send_json({
                         "message": "Patch applied",
@@ -300,7 +318,7 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
                     self._send_json({"detail": result.error}, status=403)
             finally:
                 if patch_id:
-                    runtime.governance.revoke_scoped_permission(
+                    get_runtime().governance.revoke_scoped_permission(
                         "filesystem_write",
                         scope_type="patch",
                         scope_id=patch_id
@@ -309,13 +327,13 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
             content_length = int(self.headers['Content-Length'])
             post_data = json.loads(self.rfile.read(content_length))
             permission = post_data.get("permission", "")
-            runtime.governance.grant_permission(permission)
+            get_runtime().governance.grant_permission(permission)
             self._send_json({"ok": True, "permission": permission})
         elif route == "/api/governance/revoke":
             content_length = int(self.headers['Content-Length'])
             post_data = json.loads(self.rfile.read(content_length))
             permission = post_data.get("permission", "")
-            runtime.governance.revoke_permission(permission)
+            get_runtime().governance.revoke_permission(permission)
             self._send_json({"ok": True, "permission": permission})
         else:
             self._send_json({"detail": "Route not found"}, status=404)
