@@ -28,7 +28,21 @@ class ManagementOrchestrator:
     def execute(self, plan: ManagedTaskPlan) -> ExecutionResult:
         if plan.decision.rejected:
             audit = self.auditor.verify(plan, [])
-            return ExecutionResult(ok=False, plan=plan, step_results=[], audit=audit, error="Task rejected by management policy.")
+            decision = plan.decision
+            intent = decision.intent
+            risk = decision.risk_level
+            
+            # Priority: notes["reason"] -> notes["external_tool_risk"] -> criteria[0] -> default
+            reason = decision.notes.get("reason")
+            if not reason:
+                reason = decision.notes.get("external_tool_risk")
+            if not reason and decision.success_criteria:
+                reason = decision.success_criteria[0]
+            if not reason:
+                reason = "Task rejected by management policy"
+                
+            error_msg = f"Rejected by ManagementPolicy: {intent} ({risk}) - {reason}"
+            return ExecutionResult(ok=False, plan=plan, step_results=[], audit=audit, error=error_msg)
 
         step_results = []
         for step in plan.steps:
