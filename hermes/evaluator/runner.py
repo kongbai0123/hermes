@@ -30,14 +30,26 @@ class ValidationRunner:
 
     def run_case(self, case: ValidationTask) -> ValidationResult:
         """執行單一驗證案例"""
+        # 紀錄執行前的 trace 列表引用與長度
+        old_traces_ref = self.runtime.monitor.traces
+        old_len = len(old_traces_ref)
+        
         # 執行任務
         result = self.runtime.execute_task(case.task)
         actual_status = result.get("status", "UNKNOWN")
         
-        # 從 Trace 中提取 Intent
+        # 從本次執行的 Trace 中提取 Intent
+        # 判斷 Runtime 是否重置了 trace 列表 (引用變更)
+        current_traces = self.runtime.monitor.traces
+        if current_traces is old_traces_ref:
+            # 列表未變更，說明是累積模式
+            new_traces = current_traces[old_len:]
+        else:
+            # 列表已重置，說明是單次任務模式
+            new_traces = current_traces
+            
         actual_intent = None
-        traces = self.runtime.monitor.traces
-        exec_decisions = [t for t in traces if getattr(t, 'event_type', None) == "EXECUTIVE_DECISION"]
+        exec_decisions = [t for t in new_traces if getattr(t, 'event_type', None) == "EXECUTIVE_DECISION"]
         if exec_decisions:
             actual_intent = exec_decisions[0].payload.get("intent")
         
