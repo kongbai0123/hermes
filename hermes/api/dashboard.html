@@ -1322,6 +1322,7 @@
             if (tabId === 'files') loadFileTree(state.workspace);
             if (tabId === 'mcp') renderMcpPreview(state.logs);
             if (tabId === 'shell') renderShellApprovalPanel();
+            if (tabId === 'patch') checkForPendingPatches();
         }
 
         function switchDetailTab(tabId) {
@@ -2060,13 +2061,101 @@
         }
 
         async function checkForPendingPatches() {
+            const panel = document.getElementById('patch-preview');
+            if (!panel) return;
+            
             try {
-                const resp = await fetch('/api/patch/pending');
-                if (!resp.ok) return;
-                const patches = await resp.json();
-                const panel = document.getElementById('patch-preview');
-                if (panel) panel.textContent = Array.isArray(patches) && patches.length ? JSON.stringify(patches, null, 2) : 'No pending patches.';
-            } catch (e) {}
+                const [patchResp, govResp] = await Promise.all([
+                    fetch('/api/patch/pending'),
+                    fetch('/api/governance')
+                ]);
+                
+                if (!patchResp.ok || !govResp.ok) return;
+                
+                const patches = await patchResp.json();
+                const gov = await govResp.json();
+                const grants = gov.scoped_grants || [];
+                
+                if (!Array.isArray(patches) || patches.length === 0) {
+                    panel.innerHTML = '<div class="placeholder-panel">No pending patches.</div>';
+                    return;
+                }
+                
+                panel.innerHTML = patches.map(patch => {
+                    const grant = grants.find(g => g.scope_type === 'patch' && g.scope_id === patch.id);
+                    const isAuthorized = !!grant;
+                    const isExpired = grant && grant.expires_at && (grant.expires_at < Date.now() / 1000);
+                    const timeLeft = grant ? Math.max(0, Math.round(grant.expires_at - Date.now() / 1000)) : 0;
+                    
+                    let statusHtml = '';
+                    if (isExpired) statusHtml = '<span class="tool-badge" style="background:rgba(255,77,77,0.1); color:var(--danger);">EXPIRED</span>';
+                    else if (isAuthorized) statusHtml = `<span class="tool-badge" style="background:rgba(74,222,128,0.1); color:var(--success);">AUTHORIZED (${timeLeft}s)</span>`;
+                    else statusHtml = '<span class="tool-badge badge-call">PENDING</span>';
+
+                    return `
+                        <div class="tool-card" style="margin-bottom:12px;">
+                            <div class="tool-header">
+                                <div class="tool-name">${escapeHtml(patch.path)}</div>
+                                <div>${statusHtml}</div>
+                            </div>
+                            <div class="tool-body">
+                                <div style="font-size:10px; color:var(--text-muted); margin-bottom:8px;">Reason: ${escapeHtml(patch.reason)}</div>
+                                <div class="tool-code" style="font-size:10px; max-height:100px; overflow-y:auto; margin-bottom:10px;">
+                                    <span style="color:var(--danger)">- ${escapeHtml(patch.original || '')}</span><br>
+                                    <span style="color:var(--success)">+ ${escapeHtml(patch.replacement || '')}</span>
+                                </div>
+                                <div class="tool-actions">
+                                    ${!isAuthorized || isExpired ? 
+                                        `<button class="control-btn" type="button" onclick="approvePatch('${escapeHtml(patch.id)}')">Approve Grant</button>` : 
+                                        `<button class="control-btn" style="background:var(--success); color:#000;" type="button" onclick="applyPatch('${escapeHtml(patch.id)}', '${escapeHtml(state.patchTokens?.[patch.id] || '')}')">Apply Patch</button>`
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error("Failed to load patches:", e);
+            }
+        }
+
+        async function approvePatch(patchId) {
+            try {
+                const resp = await fetch(`/api/patch/approve/${encodeURIComponent(patchId)}`, { method: 'POST' });
+                const data = await resp.json();
+                if (data.token) {
+                    if (!state.patchTokens) state.patchTokens = {};
+                    state.patchTokens[patchId] = data.token;
+                    checkForPendingPatches();
+                } else {
+                    alert("Approval failed: " + (data.error || "Unknown error"));
+                }
+            } catch (e) {
+                alert("Approval error: " + e.message);
+            }
+        }
+
+        async function applyPatch(patchId, token) {
+            if (!token) {
+                alert("No approval token found. Please approve again.");
+                return;
+            }
+            try {
+                const resp = await fetch('/api/patch/apply', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ patch_id: patchId, token: token })
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    alert("Patch applied successfully!");
+                    checkForPendingPatches();
+                } else {
+                    alert("Apply failed: " + (data.detail || "Access Denied"));
+                }
+            } catch (e) {
+                alert("Apply error: " + e.message);
+            }
         }
 
         function renderRawLogPreview(logs) {
