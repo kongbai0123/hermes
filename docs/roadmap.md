@@ -121,6 +121,7 @@ Required layout:
 [                                                   ][ Strategy         ]
 [                                                   ][ Operator         ]
 [                                                   ][ Auditor          ]
+```
 
 [ Trace ][ Tool Result ][ Patch Review ][ Files ][ MCP ][ Raw JSON ]
 ```
