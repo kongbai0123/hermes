@@ -90,5 +90,36 @@ class TestPatchHistoryAPI(unittest.TestCase):
             history_list = json.loads(resp.read().decode('utf-8'))
             self.assertFalse(any(p["id"] == pid_approve for p in history_list))
 
+
+    def test_applied_patch_appears_in_history(self):
+        # 1. 注入 Patch (使用 create 確保一定成功)
+        pid = self._inject_patch(task_id="apply-task", changes=[{"path": "test_create.py", "operation": "create", "replacement": "print(1)", "reason": "test"}])
+        
+        # 2. Approve 獲取 Token
+        req_app = Request(f"http://localhost:{self.port}/api/patch/approve/{pid}", method='POST')
+        with urlopen(req_app) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            token = data["token"]
+            self.assertIsNotNone(token)
+            
+        # 3. Apply Patch
+        apply_data = json.dumps({"patch_id": pid, "token": token}).encode('utf-8')
+        req_apply = Request(f"http://localhost:{self.port}/api/patch/apply", data=apply_data, method='POST')
+        req_apply.add_header('Content-Type', 'application/json')
+        with urlopen(req_apply) as resp:
+            self.assertEqual(resp.status, 200)
+            
+        # 4. 驗證不在 Pending
+        with urlopen(f"http://localhost:{self.port}/api/patch/pending") as resp:
+            pending_list = json.loads(resp.read().decode('utf-8'))
+            self.assertFalse(any(p["id"] == pid for p in pending_list))
+            
+        # 5. 驗證出現在 History 且狀態為 applied
+        with urlopen(f"http://localhost:{self.port}/api/patch/history") as resp:
+            history_list = json.loads(resp.read().decode('utf-8'))
+            applied_entry = next((p for p in history_list if p["id"] == pid), None)
+            self.assertIsNotNone(applied_entry)
+            self.assertEqual(applied_entry["status"], "applied")
+
 if __name__ == "__main__":
     unittest.main()
