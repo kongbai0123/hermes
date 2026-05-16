@@ -132,7 +132,17 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
             data = {
                 "budget": runtime.governance.token_budget,
                 "consumed": runtime.governance.consumed_tokens,
-                "permissions": runtime.governance.permissions
+                "permissions": runtime.governance.permissions,
+                "scoped_grants": [
+                    {
+                        "permission": g.permission,
+                        "scope_type": g.scope_type,
+                        "scope_id": g.scope_id,
+                        "expires_at": g.expires_at,
+                        "granted_by": g.granted_by
+                    }
+                    for g in runtime.governance.scoped_grants
+                ]
             }
             self._send_json(data)
         elif route.startswith("/api/"):
@@ -206,30 +216,55 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
                 }
             })
         elif route.startswith("/api/patch/approve/"):
-            patch_id = route.rsplit("/", 1)[-1]
+            patch_id = route.split("/")[-1]
             token = runtime.executor.approval_manager.approve(patch_id)
-            if not token:
-                self._send_json({"detail": "Patch proposal ID not found or invalid."}, status=404)
-                return
-            runtime.governance.grant_permission('filesystem_write')
-            self._send_json({"patch_id": patch_id, "token": token})
+            if token:
+                runtime.governance.grant_scoped_permission(
+                    "filesystem_write",
+                    scope_type="patch",
+                    scope_id=patch_id,
+                    ttl_seconds=60,
+                    granted_by="user"
+                )
+                self._send_json({
+                    "patch_id": patch_id, 
+                    "token": token,
+                    "grant": {
+                        "permission": "filesystem_write",
+                        "scope_type": "patch",
+                        "scope_id": patch_id,
+                        "ttl_seconds": 60
+                    }
+                })
+            else:
+                self._send_json({"error": "Patch not found"}, status=404)
+
         elif route == "/api/patch/apply":
             content_length = int(self.headers['Content-Length'])
-            post_data = json.loads(self.rfile.read(content_length))
-            patch_id = post_data.get("patch_id", "")
-            token = post_data.get("token", "")
-            result = runtime.executor.apply_approved_patch(patch_id=patch_id, approval_token=token)
-            runtime.governance.revoke_permission('filesystem_write')
-            if not result.ok:
-                self._send_json({"detail": result.error}, status=403)
-                return
-            self._send_json({
-                "message": "Patch applied",
-                "details": {
-                    "summary": result.summary,
-                    "content": result.content,
-                }
-            })
+            post_data = self.rfile.read(content_length)
+            params = json.loads(post_data)
+            patch_id = params.get("patch_id")
+            token = params.get("token")
+            
+            try:
+                result = runtime.executor.apply_approved_patch(patch_id, token)
+                if result.ok:
+                    self._send_json({
+                        "message": "Patch applied",
+                        "details": {
+                            "summary": result.summary,
+                            "content": result.content,
+                        }
+                    })
+                else:
+                    self._send_json({"detail": result.error}, status=403)
+            finally:
+                if patch_id:
+                    runtime.governance.revoke_scoped_permission(
+                        "filesystem_write",
+                        scope_type="patch",
+                        scope_id=patch_id
+                    )
         elif route == "/api/governance/grant":
             content_length = int(self.headers['Content-Length'])
             post_data = json.loads(self.rfile.read(content_length))
@@ -245,7 +280,7 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
         else:
             self._send_json({"detail": "Route not found"}, status=404)
 
-if __name__ == "__main__":
+def main():
     with ReusableTCPServer(("", PORT), HermesHandler) as httpd:
         print(f"[Server] Hermes OS Dashboard running at http://localhost:{PORT}")
         try:
@@ -253,3 +288,6 @@ if __name__ == "__main__":
         except KeyboardInterrupt:
             print("\n[Server] Shutting down...")
             httpd.shutdown()
+
+if __name__ == "__main__":
+    main()

@@ -29,12 +29,12 @@ class TestDashboardInteractions(unittest.TestCase):
         self.assertNotIn('title=""', self.html)
         self.assertNotIn('title="Refresh dashboard"', self.html)
 
-    def test_reply_and_preview_regions_are_scrollable(self):
+    def test_reply_and_preview_regions_use_global_scroll_model(self):
         self.assertIn(".agent-reply-body", self.html)
-        self.assertIn("max-height: 56vh", self.html)
-        self.assertIn("max-height: 48vh", self.html)
+        self.assertIn("overflow-y: visible", self.html)
+        self.assertIn("Remove max-height to allow global scroll", self.html)
+        self.assertIn(".message-stream", self.html)
         self.assertIn("overflow-y: auto", self.html)
-        self.assertIn("scrollbar-gutter: stable", self.html)
         self.assertIn("body.className = 'agent-reply-body'", self.html)
 
     def test_dashboard_uses_reply_first_managed_workspace_layout(self):

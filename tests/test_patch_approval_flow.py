@@ -1,60 +1,75 @@
 import unittest
-import json
-from hermes.core.runtime import HermesRuntime
-from hermes.core.llm_provider import MockLLMProvider
-from hermes.harness.patch import PatchProposal, FileChange
-from hermes.harness.executor import ToolResult
+import os
+import shutil
+from pathlib import Path
+from hermes.harness.executor import SafeExecutor
+from hermes.harness.constraints import ConstraintValidator
+from hermes.harness.governance import GovernanceManager
 
 class TestPatchApprovalFlow(unittest.TestCase):
     def setUp(self):
-        self.runtime = HermesRuntime(llm_provider=MockLLMProvider())
-        # Ensure we have a clean state
-        self.runtime.governance.revoke_permission("filesystem_write")
+        self.test_dir = Path("tests/tmp_patch_flow").resolve()
+        self.test_dir.mkdir(parents=True, exist_ok=True)
+        self.constraints = ConstraintValidator(workspace_root=str(self.test_dir))
+        self.governance = GovernanceManager()
+        self.executor = SafeExecutor(self.constraints, governance=self.governance)
 
-    def test_full_approval_flow(self):
-        # 1. Propose a patch
-        proposal = PatchProposal(
-            task_id="test_task",
-            changes=[
-                FileChange(path="test_file.txt", operation="create", replacement="Hello World", reason="test")
-            ]
-        )
-        self.runtime.executor.approval_manager.register_proposal(proposal)
-        patch_id = proposal.id
-        
-        # 2. Check initial state (should fail without permission)
-        # We need a token first
-        token = self.runtime.executor.approval_manager.approve(patch_id)
-        self.assertIsNotNone(token)
-        
-        # 3. Attempt apply (should fail if governance is not authorized)
-        # Note: In start_hermes.py, approve() automatically grants permission. 
-        # Here we test the underlying executor logic.
-        result = self.runtime.executor.apply_approved_patch(patch_id, token)
-        self.assertFalse(result.ok)
-        self.assertEqual(result.summary, "Governance Blocked")
-        
-        # 4. Grant permission and try again
-        self.runtime.governance.grant_permission("filesystem_write")
-        result = self.runtime.executor.apply_approved_patch(patch_id, token)
-        
-        # 5. Verify success
-        self.assertTrue(result.ok)
-        self.assertIn("successfully", result.summary)
-        
-        # Cleanup
-        import os
-        if os.path.exists("test_file.txt"):
-            os.remove("test_file.txt")
+    def tearDown(self):
+        if self.test_dir.exists():
+            shutil.rmtree(self.test_dir)
 
-    def test_invalid_token(self):
-        proposal = PatchProposal(task_id="t1", changes=[FileChange(path="x.txt", operation="create", replacement="y", reason="z")])
-        self.runtime.executor.approval_manager.register_proposal(proposal)
+    def test_full_patch_approval_flow_with_scoped_grant(self):
+        # 1. 準備一個檔案
+        target_file = self.test_dir / "app.py"
+        target_file.write_text("print('hello')", encoding='utf-8')
         
-        self.runtime.governance.grant_permission("filesystem_write")
-        result = self.runtime.executor.apply_approved_patch(proposal.id, "invalid_token")
-        self.assertFalse(result.ok)
-        self.assertEqual(result.summary, "Unauthorized")
+        # 2. 提出 Patch
+        changes = [{
+            "path": str(target_file),
+            "operation": "modify",
+            "reason": "Update greeting",
+            "replacement": "print('hello world')"
+        }]
+        proposal_result = self.executor.propose_patch(task="Update app", changes=changes)
+        self.assertTrue(proposal_result.ok)
+        patch_id = proposal_result.metadata["patch_id"]
+        
+        # 3. 嘗試在未授權時套用 (應被 Governance Blocked)
+        # 注意：雖然有 token，但沒有 governance scoped grant
+        token = self.executor.approval_manager.approve(patch_id)
+        apply_fail = self.executor.apply_approved_patch(patch_id, token)
+        self.assertFalse(apply_fail.ok)
+        self.assertIn("Governance Blocked", apply_fail.summary)
+        
+        # 4. 授予 Scoped 權限
+        self.governance.grant_scoped_permission("filesystem_write", "patch", patch_id)
+        
+        # 5. 正確套用
+        apply_success = self.executor.apply_approved_patch(patch_id, token)
+        self.assertTrue(apply_success.ok)
+        self.assertEqual(target_file.read_text(encoding='utf-8'), "print('hello world')")
+        
+        # 6. 模擬 Revoke (API 層負責，這裡手動模擬)
+        self.governance.revoke_scoped_permission("filesystem_write", "patch", patch_id)
+        self.assertFalse(self.governance.is_authorized("filesystem_write", "patch", patch_id))
+
+    def test_wrong_patch_id_cannot_use_others_grant(self):
+        # 建立兩個 Patch
+        p1_res = self.executor.propose_patch("T1", [{"path": str(self.test_dir/"1.txt"), "operation": "create", "replacement": "1"}])
+        p2_res = self.executor.propose_patch("T2", [{"path": str(self.test_dir/"2.txt"), "operation": "create", "replacement": "2"}])
+        
+        pid1 = p1_res.metadata["patch_id"]
+        pid2 = p2_res.metadata["patch_id"]
+        
+        # 只授權給 Patch 1
+        self.governance.grant_scoped_permission("filesystem_write", "patch", pid1)
+        
+        # 嘗試套用 Patch 2 (即便有 token 也不行)
+        token2 = self.executor.approval_manager.approve(pid2)
+        apply2 = self.executor.apply_approved_patch(pid2, token2)
+        
+        self.assertFalse(apply2.ok)
+        self.assertIn(f"NOT authorized for patch_id={pid2}", apply2.error)
 
 if __name__ == "__main__":
     unittest.main()

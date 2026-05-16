@@ -501,8 +501,18 @@ h2 { margin: 0; font-size: clamp(28px, 4vw, 46px); line-height: 1.08; letter-spa
         """
         套用已授權的 Patch：執行實體寫入。
         """
-        if self.governance and not self.governance.is_authorized('filesystem_write'):
-            return ToolResult(ok=False, tool='apply_approved_patch', summary='Governance Blocked', error='Filesystem write is NOT authorized by GovernanceManager.')
+        if self.governance and not self.governance.is_authorized(
+            "filesystem_write",
+            scope_type="patch",
+            scope_id=patch_id
+        ):
+            return ToolResult(
+                ok=False, 
+                tool="apply_approved_patch", 
+                summary="Governance Blocked", 
+                error=f"Filesystem write is NOT authorized for patch_id={patch_id}."
+            )
+        
         if not self.approval_manager.validate(patch_id, approval_token):
             return ToolResult(ok=False, tool="apply_approved_patch", summary="Unauthorized", error="Invalid or expired token.")
         
