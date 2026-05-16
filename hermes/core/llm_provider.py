@@ -51,7 +51,21 @@ class OllamaProvider(LLMProvider):
                 "raw": result
             }
         except Exception as e:
-            raise Exception(f"Ollama API Error: {str(e)}")
+            raise Exception(
+                "Ollama API Error: "
+                f"{str(e)} | "
+                f"base_url={self.base_url} | "
+                f"model={self.model} | "
+                f"endpoint={url} | "
+                "diagnostics: check if Ollama is running, verify connection, run `ollama list`, and test `curl http://localhost:11434/api/tags`"
+            )
+
+    def health_check(self) -> Dict[str, Any]:
+        try:
+            with urllib.request.urlopen(f"{self.base_url}/api/tags", timeout=5) as response:
+                return {"status": "ok", "data": json.loads(response.read().decode('utf-8'))}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
 
 class ClaudeProvider(LLMProvider):
     def completion(self, prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:

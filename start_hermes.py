@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from hermes.core.runtime import HermesRuntime
-from hermes.core.llm_provider import MockLLMProvider, create_llm_provider
+from hermes.core.llm_provider import MockLLMProvider, create_llm_provider, OllamaProvider
 from hermes.api.files import list_workspace_files, read_workspace_file, stat_workspace_file, status_from_result
 
 PORT = int(os.getenv("HERMES_PORT", "8000"))
@@ -13,12 +13,36 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 os.environ.setdefault("HERMES_WORKSPACE", str(PROJECT_ROOT))
 DIRECTORY = str(PROJECT_ROOT / "hermes" / "api")
 
-# 初始化 Hermes Runtime (使用 Mock 模式確保可立即執行)
+# 初始化 Hermes Runtime
 runtime = HermesRuntime(llm_provider=MockLLMProvider(), mcp_config_path=str(PROJECT_ROOT / "hermes_mcp.json"))
-
 
 class ReusableTCPServer(socketserver.TCPServer):
     allow_reuse_address = True
+
+def get_ollama_health(base_url="http://localhost:11434"):
+    import urllib.request
+    base_url = (base_url or "http://localhost:11434").rstrip("/")
+    url = f"{base_url}/api/tags"
+    try:
+        req = urllib.request.Request(url, method="GET")
+        with urllib.request.urlopen(req, timeout=5) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        models = [m.get("name") for m in payload.get("models", []) if m.get("name")]
+        return {
+            "available": True,
+            "base_url": base_url,
+            "endpoint": url,
+            "models": models,
+            "error": "",
+        }
+    except Exception as e:
+        return {
+            "available": False,
+            "base_url": base_url,
+            "endpoint": url,
+            "models": [],
+            "error": str(e),
+        }
 
 class HermesHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -32,7 +56,7 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
-        route = parsed.path
+        route = parsed.path.rstrip('/')
         query = parse_qs(parsed.query)
 
         if route == "/api/status":
@@ -64,6 +88,46 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
                 if proposal.status == "pending"
             ]
             self._send_json(data)
+        elif route == "/api/patch/pending":
+            patches = runtime.executor.approval_manager.pending_patches
+            data = [
+                {
+                    "id": patch.id,
+                    "task_id": patch.task_id,
+                    "status": patch.status,
+                    "created_at": patch.timestamp if hasattr(patch, 'timestamp') else "",
+                    "changes": [
+                        {
+                            "path": change.path,
+                            "operation": change.operation,
+                            "reason": getattr(change, "reason", ""),
+                            "original": getattr(change, "original", ""),
+                            "replacement": getattr(change, "replacement", ""),
+                        }
+                        for change in patch.changes
+                    ],
+                }
+                for patch in patches.values()
+                if patch.status == "pending"
+            ]
+            self._send_json(data)
+        elif route == "/api/providers/health":
+            base_url = query.get("base_url", ["http://localhost:11434"])[0]
+            # 建立臨時 Provider 進行測試
+            test_provider = OllamaProvider(base_url=base_url)
+            health = test_provider.health_check()
+            self._send_json({
+                "ollama": {
+                    "available": health["status"] == "ok",
+                    "base_url": base_url,
+                    "models": [m.get("name") for m in health.get("data", {}).get("models", [])] if health["status"] == "ok" else [],
+                    "error": health.get("message")
+                },
+                "mock": {
+                    "available": True,
+                    "purpose": "UI flow test only"
+                }
+            })
         elif route == "/api/governance":
             data = {
                 "budget": runtime.governance.token_budget,
@@ -71,11 +135,22 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
                 "permissions": runtime.governance.permissions
             }
             self._send_json(data)
+        elif route.startswith("/api/"):
+            self._send_json({
+                "ok": False,
+                "error": {
+                    "code": "API_ROUTE_NOT_FOUND",
+                    "message": f"Route not found: {route}",
+                },
+            }, status=404)
         else:
             return super().do_GET()
 
     def do_POST(self):
-        if self.path == "/api/task":
+        parsed = urlparse(self.path)
+        route = parsed.path.rstrip('/')
+        
+        if route == "/api/task":
             content_length = int(self.headers['Content-Length'])
             post_data = json.loads(self.rfile.read(content_length))
             task = post_data.get("task", "")
@@ -86,80 +161,95 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
             system_prompt = post_data.get("system_prompt")
             metadata = post_data.get("metadata")
             
-            # 非同步模擬執行
             print(f"[Server] Received Task: {task}")
-            runtime.configure_llm(create_llm_provider(
-                provider=provider,
-                model=model,
-                base_url=base_url,
-                temperature=temperature
-            ))
-            result = runtime.execute_task(task, user_system_prompt=system_prompt, task_metadata=metadata)
-            
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json; charset=utf-8')
-            self.end_headers()
-            self.wfile.write(json.dumps({
-                "message": "Task completed",
-                "task": task,
-                "result": result
-            }, ensure_ascii=False).encode('utf-8'))
-        elif self.path == "/api/metrics/reset":
+            try:
+                runtime.configure_llm(create_llm_provider(
+                    provider=provider,
+                    model=model,
+                    base_url=base_url,
+                    temperature=temperature
+                ))
+                result = runtime.execute_task(task, user_system_prompt=system_prompt, task_metadata=metadata)
+                self._send_json({
+                    "message": "Task completed",
+                    "task": task,
+                    "result": result
+                })
+            except Exception as e:
+                print(f"[Error] Task Execution Failed: {str(e)}")
+                self._send_json({"detail": str(e)}, status=500)
+        elif route == "/api/metrics/reset":
             runtime.monitor.reset()
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json; charset=utf-8')
-            self.end_headers()
-            self.wfile.write(json.dumps(runtime.get_status(), ensure_ascii=False).encode('utf-8'))
-        elif self.path.startswith("/api/shell/approve/"):
-            proposal_id = self.path.rsplit("/", 1)[-1]
+            self._send_json(runtime.get_status())
+        elif route.startswith("/api/shell/approve/"):
+            proposal_id = route.rsplit("/", 1)[-1]
             token = runtime.executor.shell_approval_manager.approve(proposal_id)
             if not token:
-                self.send_response(404)
-                self.send_header('Content-type', 'application/json; charset=utf-8')
-                self.end_headers()
-                self.wfile.write(json.dumps({"detail": "Shell proposal ID not found or invalid."}, ensure_ascii=False).encode('utf-8'))
+                self._send_json({"detail": "Shell proposal ID not found or invalid."}, status=404)
                 return
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json; charset=utf-8')
-            self.end_headers()
-            self.wfile.write(json.dumps({"proposal_id": proposal_id, "token": token}, ensure_ascii=False).encode('utf-8'))
-        elif self.path == "/api/shell/execute":
+            self._send_json({"proposal_id": proposal_id, "token": token})
+        elif route == "/api/shell/execute":
             content_length = int(self.headers['Content-Length'])
             post_data = json.loads(self.rfile.read(content_length))
             proposal_id = post_data.get("proposal_id", "")
             token = post_data.get("token", "")
             result = runtime.executor.execute_approved_shell(proposal_id=proposal_id, approval_token=token)
             if not result.ok:
-                self.send_response(403)
-                self.send_header('Content-type', 'application/json; charset=utf-8')
-                self.end_headers()
-                self.wfile.write(json.dumps({"detail": result.error}, ensure_ascii=False).encode('utf-8'))
+                self._send_json({"detail": result.error}, status=403)
                 return
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json; charset=utf-8')
-            self.end_headers()
-            self.wfile.write(json.dumps({
+            self._send_json({
                 "message": "Shell command executed",
                 "details": {
                     "summary": result.summary,
                     "content": result.content,
                     "metadata": result.metadata,
                 }
-            }, ensure_ascii=False).encode('utf-8'))
+            })
+        elif route.startswith("/api/patch/approve/"):
+            patch_id = route.rsplit("/", 1)[-1]
+            token = runtime.executor.approval_manager.approve(patch_id)
+            if not token:
+                self._send_json({"detail": "Patch proposal ID not found or invalid."}, status=404)
+                return
+            runtime.governance.grant_permission('filesystem_write')
+            self._send_json({"patch_id": patch_id, "token": token})
+        elif route == "/api/patch/apply":
+            content_length = int(self.headers['Content-Length'])
+            post_data = json.loads(self.rfile.read(content_length))
+            patch_id = post_data.get("patch_id", "")
+            token = post_data.get("token", "")
+            result = runtime.executor.apply_approved_patch(patch_id=patch_id, approval_token=token)
+            runtime.governance.revoke_permission('filesystem_write')
+            if not result.ok:
+                self._send_json({"detail": result.error}, status=403)
+                return
+            self._send_json({
+                "message": "Patch applied",
+                "details": {
+                    "summary": result.summary,
+                    "content": result.content,
+                }
+            })
+        elif route == "/api/governance/grant":
+            content_length = int(self.headers['Content-Length'])
+            post_data = json.loads(self.rfile.read(content_length))
+            permission = post_data.get("permission", "")
+            runtime.governance.grant_permission(permission)
+            self._send_json({"ok": True, "permission": permission})
+        elif route == "/api/governance/revoke":
+            content_length = int(self.headers['Content-Length'])
+            post_data = json.loads(self.rfile.read(content_length))
+            permission = post_data.get("permission", "")
+            runtime.governance.revoke_permission(permission)
+            self._send_json({"ok": True, "permission": permission})
+        else:
+            self._send_json({"detail": "Route not found"}, status=404)
 
-def main():
-    print(f"[*] Hermes Agent OS Loading...")
-    print(f"[*] Dashboard URL: http://localhost:{PORT}/dashboard.html")
-    print(f"[*] API Server: Active")
-
+if __name__ == "__main__":
     with ReusableTCPServer(("", PORT), HermesHandler) as httpd:
-        print(f"[+] Hermes is LIVE. Please open the URL in your browser.")
+        print(f"[Server] Hermes OS Dashboard running at http://localhost:{PORT}")
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
-            print("\n[*] Stopping Hermes...")
+            print("\n[Server] Shutting down...")
             httpd.shutdown()
-
-
-if __name__ == "__main__":
-    main()
