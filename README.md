@@ -1,4 +1,5 @@
 # ⚡ Hermes Agent OS
+[![Hermes Governance CI](https://github.com/kongbai0123/hermes/actions/workflows/test.yml/badge.svg)](https://github.com/kongbai0123/hermes/actions/workflows/test.yml)
 
 > **A Cyberpunk-Themed Local AI Agent Operating System.**
 

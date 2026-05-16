@@ -1,0 +1,30 @@
+name: Hermes Governance CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        
+    - name: Syntax check
+      run: python -m py_compile start_hermes.py
+      
+    - name: Run all tests
+      run: python -m unittest discover -s tests -p "test_*.py"
+      env:
+        HERMES_WORKSPACE: ${{ github.workspace }}
