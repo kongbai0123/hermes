@@ -10,17 +10,69 @@ class HermesAPIBridge:
         self.base_url = (base_url or os.getenv("HERMES_BASE_URL") or "http://localhost:8000").rstrip("/")
         self.timeout_seconds = float(os.getenv("HERMES_API_TIMEOUT_SECONDS", str(timeout_seconds)))
 
-    def run_task(self, task: str) -> tuple[dict, bool]:
+    def run_task(
+        self,
+        task: str,
+        provider: str | None = None,
+        model: str | None = None,
+        base_url: str | None = None,
+        temperature: float | None = None,
+    ) -> tuple[dict, bool]:
+        # 決定 Provider
+        resolved_provider = (
+            provider or 
+            os.getenv("HERMES_MCP_PROVIDER") or 
+            os.getenv("HERMES_DEFAULT_PROVIDER") or 
+            "mock"
+        )
+        
+        # 決定來源標記
+        provider_source = "default"
+        if provider: provider_source = "argument"
+        elif os.getenv("HERMES_MCP_PROVIDER"): provider_source = "env"
+        elif os.getenv("HERMES_DEFAULT_PROVIDER"): provider_source = "env_default"
+
         payload = {
             "task": task,
-            "provider": "mock",
+            "provider": resolved_provider,
             "metadata": {
                 "source": "mcp",
                 "client": "claude_code",
                 "entrypoint": "hermes.mcp_server",
                 "tool": "hermes.run_task",
+                "provider_source": provider_source
             },
         }
+
+        # 決定 Model
+        resolved_model = (
+            model or 
+            os.getenv("HERMES_MCP_MODEL") or 
+            os.getenv("HERMES_DEFAULT_MODEL")
+        )
+        if resolved_model:
+            payload["model"] = resolved_model
+
+        # 決定 Base URL
+        resolved_base_url = (
+            base_url or 
+            os.getenv("HERMES_MCP_BASE_URL") or 
+            os.getenv("HERMES_OLLAMA_BASE_URL")
+        )
+        if resolved_base_url:
+            payload["base_url"] = resolved_base_url
+
+        # 決定 Temperature
+        resolved_temp = (
+            temperature if temperature is not None else 
+            os.getenv("HERMES_MCP_TEMPERATURE")
+        )
+        if resolved_temp is not None:
+            try:
+                payload["temperature"] = float(resolved_temp)
+            except (ValueError, TypeError):
+                pass
+
         return self._request_json("POST", "/api/task", payload)
 
     def get_status(self) -> tuple[dict, bool]:

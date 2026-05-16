@@ -31,7 +31,19 @@ class HermesMCPServer:
             task = arguments.get("task")
             if not task:
                 raise ValueError("hermes.run_task requires a task argument")
-            payload, is_error = self.bridge.run_task(task)
+            
+            provider = arguments.get("provider")
+            model = arguments.get("model")
+            base_url = arguments.get("base_url")
+            temperature = arguments.get("temperature")
+            
+            payload, is_error = self.bridge.run_task(
+                task,
+                provider=provider,
+                model=model,
+                base_url=base_url,
+                temperature=temperature,
+            )
             return make_text_result(payload, is_error=is_error)
         if name == "hermes.get_status":
             payload, is_error = self.bridge.get_status()

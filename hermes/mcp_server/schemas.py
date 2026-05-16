@@ -8,6 +8,10 @@ RUN_TASK_INPUT_SCHEMA = {
     "type": "object",
     "properties": {
         "task": {"type": "string"},
+        "provider": {"type": "string"},
+        "model": {"type": "string"},
+        "base_url": {"type": "string"},
+        "temperature": {"type": "number"}
     },
     "required": ["task"],
 }
