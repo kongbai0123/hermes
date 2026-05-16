@@ -25,7 +25,16 @@ class TestAPIRoutes(unittest.TestCase):
             stderr=subprocess.PIPE,
             env={**os.environ, "HERMES_PORT": str(cls.port)}
         )
-        time.sleep(2) # 等待伺服器啟動
+        # 增加等待時間並使用重試機制確認伺服器啟動
+        for _ in range(10):
+            try:
+                with urlopen(f"http://localhost:{cls.port}/") as response:
+                    if response.status == 200:
+                        break
+            except:
+                time.sleep(2)
+        else:
+            raise Exception("Server failed to start in time")
 
     @classmethod
     def tearDownClass(cls):
