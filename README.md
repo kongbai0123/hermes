@@ -15,6 +15,7 @@ Hermes 是一個致力於提供高度可觀測、受控且安全的本地 AI 代
 - **Governance Layer**: 內置 `GovernanceManager` 與 `SafeExecutor`，所有高風險操作（寫入、Shell）均需雙重授權。
 - **Management Decision Layer**: 展示 Executive、Strategy、Operator、Auditor 四層管理鏈，實現 AI 決策透明化。
 - **Local-First (Ollama)**: 支援 Ollama 本地模型（如 Qwen2.5/3），確保您的數據隱私不出站。
+- **Model Context Protocol (MCP)**: 提供標準化的 MCP Server 入口，支持與 Claude Code、Cursor 等客戶端深度集成。[查看 MCP 指南](docs/mcp.md)
 
 ## 🛠️ 技術棧 (Tech Stack)
 
