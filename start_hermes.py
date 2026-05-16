@@ -121,6 +121,24 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
                     ],
                 })
             self._send_json(data)
+        elif route == "/api/patch/history":
+            patches = runtime.executor.approval_manager.pending_patches
+            data = []
+            for patch in patches.values():
+                if patch.status == "pending":
+                    continue
+                
+                data.append({
+                    "id": patch.id,
+                    "path": getattr(patch, "path", patch.changes[0].path if patch.changes else "unknown"),
+                    "reason": getattr(patch, "reason", patch.task_id),
+                    "status": patch.status,
+                    "timestamp": patch.timestamp,
+                    "changes_count": len(patch.changes)
+                })
+            # 按時間倒序排列
+            data.sort(key=lambda x: x["timestamp"], reverse=True)
+            self._send_json(data[:20]) # 回傳最近 20 筆
         elif route == "/api/providers/health":
             base_url = query.get("base_url", ["http://localhost:11434"])[0]
             # 建立臨時 Provider 進行測試

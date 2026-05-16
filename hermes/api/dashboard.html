@@ -1162,6 +1162,10 @@
 
         <div class="panel-content panel-hidden" id="panel-patch">
             <div id="patch-preview" class="placeholder-panel">No pending patches.</div>
+            <div style="margin-top: 24px; padding: 0 16px;">
+                <div class="section-label" style="margin-bottom: 12px;">Recent History</div>
+                <div id="patch-history" class="placeholder-panel" style="font-size: 11px; padding: 0;">No history yet.</div>
+            </div>
         </div>
 
         <div class="panel-content panel-hidden" id="panel-shell">
@@ -1347,7 +1351,10 @@
             if (tabId === 'files') loadFileTree(state.workspace);
             if (tabId === 'mcp') renderMcpPreview(state.logs);
             if (tabId === 'shell') renderShellApprovalPanel();
-            if (tabId === 'patch') checkForPendingPatches();
+            if (tabId === 'patch') {
+                checkForPendingPatches();
+                loadPatchHistory();
+            }
         }
 
         function switchDetailTab(tabId) {
@@ -2168,12 +2175,45 @@
                 const resp = await fetch(`/api/patch/reject/${encodeURIComponent(patchId)}`, { method: 'POST' });
                 if (resp.ok) {
                     checkForPendingPatches();
+                    loadPatchHistory();
                 } else {
                     const data = await resp.json();
                     alert("Reject failed: " + (data.error || "Unknown error"));
                 }
             } catch (e) {
                 alert("Reject error: " + e.message);
+            }
+        }
+
+        async function loadPatchHistory() {
+            const panel = document.getElementById('patch-history');
+            if (!panel) return;
+            try {
+                const resp = await fetch('/api/patch/history');
+                if (!resp.ok) return;
+                const history = await resp.json();
+                if (!Array.isArray(history) || history.length === 0) {
+                    panel.innerHTML = '<div class="placeholder-panel" style="font-size:11px; padding:12px; border:1px dashed var(--border-subtle); border-radius:var(--radius-sm);">No history yet.</div>';
+                    return;
+                }
+                panel.innerHTML = history.map(item => {
+                    const date = new Date(item.timestamp * 1000).toLocaleTimeString();
+                    const statusColor = item.status === 'applied' ? 'var(--success)' : (item.status === 'rejected' ? 'var(--danger)' : 'var(--text-muted)');
+                    return `
+                        <div style="padding: 8px 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); margin-bottom: 6px; background: rgba(255,255,255,0.01);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                <span style="font-family: var(--font-mono); color: var(--text-primary); font-size: 10px;">${escapeHtml(item.path)}</span>
+                                <span style="font-size: 9px; font-weight: 800; color: ${statusColor}; text-transform: uppercase;">${item.status}</span>
+                            </div>
+                            <div style="font-size: 9px; color: var(--text-muted); display: flex; justify-content: space-between;">
+                                <span>${escapeHtml(item.reason)}</span>
+                                <span>${date}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error("Failed to load patch history:", e);
             }
         }
 
@@ -2191,6 +2231,7 @@
                 const data = await resp.json();
                 if (resp.ok) {
                     checkForPendingPatches();
+                    loadPatchHistory();
                 } else {
                     alert("Apply failed: " + (data.detail || "Access Denied"));
                 }
