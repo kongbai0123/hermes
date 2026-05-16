@@ -48,23 +48,27 @@ class GovernanceManager:
             print(f"[Governance] Permission REVOKED: {permission}")
 
     def is_authorized(self, action_type: str, scope_type: Optional[str] = None, scope_id: Optional[str] = None) -> bool:
-        # 1. 檢查全域權限 (向下相容)
+        self.cleanup_expired_grants()
+        
+        # 如果提供了 Scope，則強制執行 Scoped 檢查，不允許回退到全域權限
+        if scope_type is not None or scope_id is not None:
+            for grant in self.scoped_grants:
+                if grant.permission == action_type:
+                    # 匹配 scope_type (如果提供)
+                    if scope_type and grant.scope_type != scope_type:
+                        continue
+                    # 匹配 scope_id (如果提供)
+                    if scope_id and grant.scope_id != scope_id:
+                        continue
+                    
+                    # 只要有一個 matching scoped grant 未過期，即通過
+                    return True
+            return False
+
+        # 如果沒有提供 Scope，檢查全域權限 (向下相容)
         if self.permissions.get(action_type, False):
             return True
             
-        # 2. 檢查 Scoped 權限
-        self.cleanup_expired_grants()
-        for grant in self.scoped_grants:
-            if grant.permission == action_type:
-                if scope_type and grant.scope_type != scope_type:
-                    continue
-                if scope_id and grant.scope_id != scope_id:
-                    continue
-                
-                # 如果有指定 scope 但 grant 是全域的 (scope 為空)，或者 scope 完全匹配
-                if (not scope_type or grant.scope_type == scope_type) and \
-                   (not scope_id or grant.scope_id == scope_id):
-                    return True
         return False
 
     def grant_scoped_permission(self, permission: str, scope_type: str, scope_id: str, ttl_seconds: int = 60, granted_by: str = "user"):

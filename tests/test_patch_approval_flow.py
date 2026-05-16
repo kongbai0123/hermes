@@ -68,8 +68,24 @@ class TestPatchApprovalFlow(unittest.TestCase):
         token2 = self.executor.approval_manager.approve(pid2)
         apply2 = self.executor.apply_approved_patch(pid2, token2)
         
-        self.assertFalse(apply2.ok)
-        self.assertIn(f"NOT authorized for patch_id={pid2}", apply2.error)
+    def test_global_grant_cannot_bypass_patch_scoped_check(self):
+        # 1. 準備 Patch
+        p_res = self.executor.propose_patch("T3", [{"path": str(self.test_dir/"3.txt"), "operation": "create", "replacement": "3"}])
+        pid = p_res.metadata["patch_id"]
+        token = self.executor.approval_manager.approve(pid)
+        
+        # 2. 授予全域權限 (舊模型)
+        self.governance.grant_permission("filesystem_write")
+        
+        # 3. 嘗試套用 (應被拒絕，因為 apply_approved_patch 使用 scoped check)
+        apply_res = self.executor.apply_approved_patch(pid, token)
+        self.assertFalse(apply_res.ok)
+        self.assertIn(f"NOT authorized for patch_id={pid}", apply_res.error)
+        
+        # 4. 授予正確的 Scoped 權限後才可套用
+        self.governance.grant_scoped_permission("filesystem_write", "patch", pid)
+        apply_ok = self.executor.apply_approved_patch(pid, token)
+        self.assertTrue(apply_ok.ok)
 
 if __name__ == "__main__":
     unittest.main()

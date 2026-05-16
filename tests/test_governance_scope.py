@@ -42,11 +42,20 @@ class TestGovernanceScope(unittest.TestCase):
         time.sleep(1.1)
         self.assertFalse(self.governance.is_authorized("filesystem_write", "patch", patch_id))
 
+    def test_global_grant_does_not_satisfy_scoped_check(self):
+        # 授予全域權限
+        self.governance.grant_permission("filesystem_write")
+        
+        # 檢查不帶 scope 的請求 -> 通過
+        self.assertTrue(self.governance.is_authorized("filesystem_write"))
+        
+        # 檢查帶有 scope 的請求 -> 不應通過 (強制要求 scoped grant)
+        self.assertFalse(self.governance.is_authorized("filesystem_write", "patch", "patch-123"))
+
     def test_global_grant_backward_compatibility(self):
         self.governance.grant_permission("network_access")
-        # 全域授權應該對任何 scope 都有效 (或不指定 scope)
+        # 全域授權對不指定 scope 的請求有效
         self.assertTrue(self.governance.is_authorized("network_access"))
-        self.assertTrue(self.governance.is_authorized("network_access", "any", "thing"))
 
     def test_revoke_scoped_permission(self):
         pid = "patch-to-revoke"
