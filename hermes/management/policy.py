@@ -102,18 +102,6 @@ class ManagementPolicy:
                 criteria=["測試工具必須回傳結果", "失敗時必須回報錯誤摘要"],
             )
 
-        if self._contains_any(lowered, ["mcp", "github issue", "外部工具"]):
-            return self._decision(
-                text,
-                "mcp_read",
-                "low",
-                requires_tools=True,
-                requires_write=False,
-                requires_user_approval=False,
-                criteria=["MCP 工具必須經 ToolRegistry 執行", "只允許 read-only MCP tool", "MCP 呼叫必須留下 Trace"],
-                notes={"requires_mcp": True, "external_tool_risk": "low"},
-            )
-
         wants_site = self._contains_any(lowered, ["網站", "網頁", "頁面", "website", "site", "static site"])
         wants_build = self._contains_any(lowered, ["架設", "建立", "新增", "create", "生成", "製作", "產生", "做一個", "本地"])
         if wants_site and wants_build:
@@ -148,6 +136,18 @@ class ManagementPolicy:
                     "不可改動 Hermes 原始碼",
                     "回覆中必須列出實際建立的檔案",
                 ],
+            )
+
+        if self._contains_any(lowered, ["mcp", "github issue", "外部工具"]):
+            return self._decision(
+                text,
+                "mcp_read",
+                "low",
+                requires_tools=True,
+                requires_write=False,
+                requires_user_approval=False,
+                criteria=["MCP 工具必須經 ToolRegistry 執行", "只允許 read-only MCP tool", "MCP 呼叫必須留下 Trace"],
+                notes={"requires_mcp": True, "external_tool_risk": "low"},
             )
 
         if self._contains_any(lowered, ["搜尋", "grep", "search", "找"]):

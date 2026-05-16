@@ -95,6 +95,26 @@ class TestManagementPolicy(unittest.TestCase):
             self.assertNotEqual(decision.intent, "general_chat")
             self.assertIn(decision.risk_level, {"requires_user_approval", "reject"})
 
+    def test_generate_static_site_with_mcp_word_routes_to_generate_static_site(self):
+        decision = self.policy.classify_task("請在 user_projects 進行 MCP 作業，生成一份簡約風網站")
+        
+        self.assertEqual(decision.intent, "generate_static_site")
+        self.assertTrue(decision.requires_write)
+        # Even if it contains "mcp", it shouldn't be trapped in mcp_read if it's a site generation task
+        self.assertNotEqual(decision.intent, "mcp_read")
+
+    def test_mcp_read_still_routes_to_mcp_read(self):
+        decision = self.policy.classify_task("請用 MCP 讀取 GitHub issue")
+        
+        self.assertEqual(decision.intent, "mcp_read")
+        self.assertFalse(decision.requires_write)
+
+    def test_create_project_with_mcp_word_routes_to_create_project(self):
+        decision = self.policy.classify_task("請用 MCP 幫我建立一個本地專案 demo_app")
+        
+        self.assertEqual(decision.intent, "create_project")
+        self.assertTrue(decision.requires_write)
+
 
 if __name__ == "__main__":
     unittest.main()
