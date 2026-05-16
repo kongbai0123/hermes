@@ -21,6 +21,9 @@ class ApprovalManager:
             return None
         
         proposal = self.pending_patches[patch_id]
+        if proposal.status == "rejected":
+            return None
+            
         token = secrets.token_hex(16)
         
         self.tokens[token] = {
@@ -45,6 +48,8 @@ class ApprovalManager:
             return False
 
         proposal = self.pending_patches[patch_id]
+        if proposal.status == "rejected":
+            return False
         if record.get("patch_hash") != self._hash_proposal(proposal):
             return False
             

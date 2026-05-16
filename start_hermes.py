@@ -100,8 +100,8 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
                 
                 data.append({
                     "id": patch.id,
-                    "path": patch.path,
-                    "reason": patch.reason,
+                    "path": getattr(patch, "path", patch.changes[0].path if patch.changes else "unknown"),
+                    "reason": getattr(patch, "reason", patch.task_id),
                     "status": patch.status,
                     "created_at": patch.timestamp if hasattr(patch, 'timestamp') else "",
                     "grant": {
@@ -251,11 +251,12 @@ class HermesHandler(http.server.SimpleHTTPRequestHandler):
 
         elif route.startswith("/api/patch/reject/"):
             patch_id = route.split("/")[-1]
-            if patch_id in runtime.executor.approval_manager.pending_patches:
+            patch = runtime.executor.approval_manager.pending_patches.get(patch_id)
+            if patch:
                 # 撤銷相關授權
                 runtime.governance.revoke_scoped_permission("filesystem_write", "patch", patch_id)
-                # 從 pending 移除
-                runtime.executor.approval_manager.pending_patches.pop(patch_id)
+                # 標記為 rejected (保留在歷史中)
+                patch.status = "rejected"
                 self._send_json({"patch_id": patch_id, "status": "rejected"})
             else:
                 self._send_json({"error": "Patch not found"}, status=404)
