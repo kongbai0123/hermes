@@ -9,18 +9,7 @@ import signal
 
 import socket
 
-def wait_for_server(base_url, timeout=10):
-    deadline = time.time() + timeout
-    last_error = None
-    while time.time() < deadline:
-        try:
-            with urlopen(f"{base_url}/api/status", timeout=1) as resp:
-                if resp.status == 200:
-                    return
-        except Exception as exc:
-            last_error = exc
-            time.sleep(0.25)
-    raise RuntimeError(f"Server did not become ready at {base_url}: {last_error}")
+from tests.test_utils import wait_for_server
 
 def get_free_port():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -39,15 +28,13 @@ class TestAPIRoutes(unittest.TestCase):
             stderr=subprocess.PIPE,
             env={**os.environ, "HERMES_PORT": str(cls.port)}
         )
-        try:
-            wait_for_server(cls.base_url)
-        except Exception as e:
+        if not wait_for_server(cls.base_url):
             # 讀取部分輸出以便 CI 除錯
             out, err = cls.server_process.communicate(timeout=1)
             print(f"\n[DEBUG] Server stdout: {out.decode('utf-8', errors='replace')}")
             print(f"[DEBUG] Server stderr: {err.decode('utf-8', errors='replace')}")
             cls.server_process.terminate()
-            raise e
+            raise RuntimeError("Server did not become ready in time")
 
     @classmethod
     def tearDownClass(cls):

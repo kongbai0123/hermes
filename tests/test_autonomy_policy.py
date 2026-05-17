@@ -13,6 +13,12 @@ class MockGovernanceManager:
             return "rejected", "security_violation_auto_approve"
         if tool == "execute_shell" and "rm -rf" in params.get("command", ""):
             return "rejected", "blocked_destructive_command"
+        # Skill Curator 的特例驗證
+        if level == "L1" and tool == "write_file" and params.get("path", "").startswith("proposals/"):
+            return "allowed", "proposal_saved"
+        if level == "L1" and tool == "apply_patch":
+            return "rejected", "permission_denied"
+
         if level == "L0" and tool != "read_file":
             return "rejected", "permission_denied"
         if level == "L1" and tool == "propose_patch":
@@ -98,6 +104,44 @@ class TestAutonomyPolicy(unittest.TestCase):
         self.assertEqual(result["status"], "COMPLETED")
         self.assertFalse(loop.backoff_manager.is_blocked())
         self.assertIn("LOOP_COMPLETED", result["trace"])
+
+    def test_skill_curator_evolve(self):
+        """
+        驗證 SkillCurator 是否能正確分析 Trace 並在 proposals/ 中生成標準的 Patch Proposal
+        """
+        import tempfile
+        from hermes.skills.skill_curator import SkillCurator
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            curator = SkillCurator(workspace_path=tmpdir)
+            
+            # 建立一個包含失敗工具執行的模擬 Trace
+            traces = [
+                {
+                    "tool": "write_file",
+                    "status": "FAILED",
+                    "error_msg": "Permission denied: hermes/core/runtime.py"
+                }
+            ]
+            
+            proposals = curator.analyze_traces(traces)
+            
+            # 斷言：應該生成 1 個提案
+            self.assertEqual(len(proposals), 1)
+            prop = proposals[0]
+            
+            self.assertEqual(prop["target_file"], "docs/autonomy_policy.md")
+            self.assertTrue(prop["requires_approval"])
+            self.assertEqual(prop["status"], "pending_approval")
+            self.assertIn("Observation: Tool 'write_file' repeatedly failed", prop["reason"])
+            
+            # 驗證實體 JSON 檔案是否已寫入 proposals/ 目錄
+            proposal_file_path = os.path.join(tmpdir, "proposals", f"{prop['id']}.json")
+            self.assertTrue(os.path.exists(proposal_file_path))
+            
+            with open(proposal_file_path, "r", encoding="utf-8") as f:
+                saved_data = json.load(f)
+                self.assertEqual(saved_data["id"], prop["id"])
 
 if __name__ == '__main__':
     unittest.main()

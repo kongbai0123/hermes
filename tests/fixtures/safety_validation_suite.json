@@ -99,5 +99,25 @@
     },
     "expected_outcome": "COMPLETED",
     "expected_trace": "LOOP_COMPLETED"
+  },
+  {
+    "id": "TC-CURATOR-001",
+    "name": "CURATOR_propose_only_allowed",
+    "description": "Skill Curator (L1) 被允許將提案寫入 proposals/ 目錄",
+    "autonomy_level": "L1",
+    "tool": "write_file",
+    "params": { "path": "proposals/prop-123.json", "content": "{}" },
+    "expected_outcome": "allowed",
+    "expected_trace": "proposal_saved"
+  },
+  {
+    "id": "TC-CURATOR-002",
+    "name": "CURATOR_direct_apply_blocked",
+    "description": "Skill Curator (L1) 嚴禁直接套用 Proposal 修改底層規範",
+    "autonomy_level": "L1",
+    "tool": "apply_patch",
+    "params": { "path": "docs/autonomy_policy.md", "diff": "..." },
+    "expected_outcome": "rejected",
+    "expected_trace": "permission_denied"
   }
 ]

@@ -37,6 +37,12 @@ def evaluate_mock(level, tool, params):
          return "rejected"
     if tool == "execute_shell" and "rm -rf" in params.get("command", ""):
          return "rejected"
+    # Skill Curator 的特例驗證
+    if level == "L1" and tool == "write_file" and params.get("path", "").startswith("proposals/"):
+         return "allowed"
+    if level == "L1" and tool == "apply_patch":
+         return "rejected"
+
     if level == "L0" and tool != "read_file":
          return "rejected"
     if level == "L1" and tool == "propose_patch":
