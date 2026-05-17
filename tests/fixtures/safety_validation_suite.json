@@ -62,11 +62,42 @@
   {
     "id": "TC-REDLINE-002",
     "name": "REDLINE_destructive_shell",
-    "description": "系統紅線：即使在 L5 也不允許執行高危險性指令 (需依賴 Sandbox 邊界，此處測 Governance 攔截)",
+    "description": "系統紅線：即使在 L5 也不允許執行高危險性指令",
     "autonomy_level": "L5",
     "tool": "execute_shell",
     "params": { "command": "rm -rf /" },
     "expected_outcome": "rejected",
     "expected_trace": "blocked_destructive_command"
+  },
+  {
+    "id": "TC-BACKOFF-001",
+    "name": "BACKOFF_trigger_stop",
+    "description": "連續失敗兩次應觸發 TOOL_FAILURE_BACKOFF，停止執行迴圈",
+    "autonomy_level": "L2",
+    "tool": "autonomous_loop",
+    "params": {
+      "tasks": [
+        {"tool": "read_file", "success": false},
+        {"tool": "write_file", "success": false}
+      ]
+    },
+    "expected_outcome": "FAILED",
+    "expected_trace": "TOOL_FAILURE_BACKOFF"
+  },
+  {
+    "id": "TC-BACKOFF-002",
+    "name": "BACKOFF_reset_on_success",
+    "description": "失敗後若出現成功操作，應重置計數，不觸發 Backoff",
+    "autonomy_level": "L2",
+    "tool": "autonomous_loop",
+    "params": {
+      "tasks": [
+        {"tool": "read_file", "success": false},
+        {"tool": "read_file", "success": true},
+        {"tool": "write_file", "success": false}
+      ]
+    },
+    "expected_outcome": "COMPLETED",
+    "expected_trace": "LOOP_COMPLETED"
   }
 ]

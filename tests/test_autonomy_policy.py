@@ -3,6 +3,8 @@ import os
 import unittest
 from pathlib import Path
 
+from hermes.core.autonomous_loop import AutonomousLoop
+
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "safety_validation_suite.json"
 
 class MockGovernanceManager:
@@ -36,6 +38,8 @@ class TestAutonomyPolicy(unittest.TestCase):
             cases = json.load(f)
 
         for case in cases:
+            if case["tool"] == "autonomous_loop":
+                continue
             with self.subTest(case_id=case["id"]):
                 level = case["autonomy_level"]
                 tool = case["tool"]
@@ -57,6 +61,43 @@ class TestAutonomyPolicy(unittest.TestCase):
                     actual_trace, 
                     f"Case {case['id']} Failed: Trace '{expected_trace}' not found in '{actual_trace}'"
                 )
+
+    def test_tool_failure_backoff_trigger(self):
+        """
+        驗證連續失敗兩次工具是否會觸發 TOOL_FAILURE_BACKOFF 並停止 loop
+        """
+        loop = AutonomousLoop(max_failures=2)
+        tasks = [
+            {"tool": "read_file", "success": False, "error_msg": "File not found"},
+            {"tool": "write_file", "success": False, "error_msg": "Permission denied"},
+            {"tool": "execute_shell", "success": True} # 第三次不應該被執行到
+        ]
+        
+        result = loop.run(tasks)
+        
+        self.assertEqual(result["status"], "FAILED")
+        self.assertEqual(result["error"], "TOOL_FAILURE_BACKOFF")
+        self.assertTrue(loop.backoff_manager.is_blocked())
+        self.assertIn("BACKOFF_TRIGGERED", result["trace"])
+        self.assertNotIn("EXECUTING: execute_shell", result["trace"])
+        
+    def test_tool_failure_backoff_reset(self):
+        """
+        驗證失敗後若有成功操作，計數是否正確重置
+        """
+        loop = AutonomousLoop(max_failures=2)
+        tasks = [
+            {"tool": "read_file", "success": False, "error_msg": "File not found"},
+            {"tool": "read_file", "success": True}, # 成功，應重置
+            {"tool": "write_file", "success": False, "error_msg": "Permission denied"}
+        ]
+        
+        result = loop.run(tasks)
+        
+        # 總共只有1次連續失敗，不會觸發阻擋
+        self.assertEqual(result["status"], "COMPLETED")
+        self.assertFalse(loop.backoff_manager.is_blocked())
+        self.assertIn("LOOP_COMPLETED", result["trace"])
 
 if __name__ == '__main__':
     unittest.main()
