@@ -260,6 +260,7 @@ class HermesRuntime:
         self.state_machine.transition_to(AgentState.EXECUTING)
         observations = []
         tool_descriptions = self.tools.get_all_descriptions()
+        consecutive_failures = {}
         
         system_prompt = "You are Hermes Agent OS. Mode: AUTONOMOUS_LOOP." + chr(10)
         system_prompt += "Default Language: Traditional Chinese (zh-Hant) when user writes in Chinese." + chr(10)
@@ -329,8 +330,25 @@ class HermesRuntime:
             
             if result.ok:
                 observations.append("Tool " + plan.tool + " result: " + str(result.content))
+                consecutive_failures[plan.tool] = 0
             else:
-                observations.append("Tool " + plan.tool + " failed: " + str(result.error))
+                consecutive_failures[plan.tool] = consecutive_failures.get(plan.tool, 0) + 1
+                fail_count = consecutive_failures[plan.tool]
+                
+                if fail_count > 1:
+                    # Apply exponential backoff sleep (e.g. 2s, 4s, 8s max)
+                    backoff_time = min(2 ** (fail_count - 1), 8)
+                    self.monitor.traces.append(RuntimeTrace("TOOL_BACKOFF", f"Tool {plan.tool} failed consecutively. Backing off for {backoff_time}s.", {
+                        "tool": plan.tool,
+                        "consecutive_failures": fail_count,
+                        "backoff_duration_seconds": backoff_time
+                    }))
+                    time.sleep(backoff_time)
+                    observations.append(f"Tool {plan.tool} failed: {result.error} (Consecutive failures: {fail_count}, Backoff: {backoff_time}s). Please adjust parameters or try an alternative tool.")
+                else:
+                    observations.append(f"Tool {plan.tool} failed: {result.error}")
+
+
                 
         # If we reached max iterations
         self.state_machine.transition_to(AgentState.VERIFYING)

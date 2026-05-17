@@ -86,5 +86,32 @@ class TestAutonomousLoopBehavior(unittest.TestCase):
         tool_calls = [t for t in result["trace"] if t["action"] == "TOOL_CALL"]
         self.assertEqual(len(tool_calls), 3)
 
+    def test_autonomous_loop_failure_backoff(self):
+        # 驗證如果工具連續失敗，是否會觸發 TOOL_BACKOFF trace 與時間延遲
+        responses = [
+            {"thought": "Reading non-existent file", "tool": "read_file", "args": {"path": "non_existent_file_123.txt"}},
+            {"thought": "Reading again", "tool": "read_file", "args": {"path": "non_existent_file_123.txt"}},
+            {"final": "Done trying."}
+        ]
+        runtime = HermesRuntime(llm_provider=ScriptedLoopProvider(responses))
+        
+        import unittest.mock as mock
+        with mock.patch("time.sleep") as mock_sleep:
+            result = runtime.execute_task("Read non-existent file twice")
+            
+            # 應順利完成任務，狀態為 DONE
+            self.assertEqual(result["status"], "DONE")
+            
+            # 驗證是否寫入 TOOL_BACKOFF 類型的 trace
+            backoff_traces = [t for t in result["trace"] if t["action"] == "TOOL_BACKOFF"]
+            self.assertEqual(len(backoff_traces), 1)
+            self.assertEqual(backoff_traces[0]["data"]["tool"], "read_file")
+            self.assertEqual(backoff_traces[0]["data"]["consecutive_failures"], 2)
+            self.assertEqual(backoff_traces[0]["data"]["backoff_duration_seconds"], 2)
+            
+            # 驗證 time.sleep 被調用了 2 秒
+            mock_sleep.assert_called_once_with(2)
+
 if __name__ == '__main__':
     unittest.main()
+
