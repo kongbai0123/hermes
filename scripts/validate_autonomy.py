@@ -10,6 +10,11 @@ import json
 import sys
 from pathlib import Path
 
+# 動態設定 PYTHONPATH，確保可直接執行
+PROJECT_ROOT = Path(__file__).parent.parent.resolve()
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 # 色彩輸出代碼
 class Colors:
     HEADER = '\033[95m'
@@ -23,6 +28,11 @@ class Colors:
 
 # 假設或 Mock 的評估函式 (同測試腳本，請對接真實核心代碼)
 def evaluate_mock(level, tool, params):
+    if tool == "autonomous_loop":
+        from hermes.core.autonomous_loop import AutonomousLoop
+        loop = AutonomousLoop(max_failures=2)
+        res = loop.run(params.get("tasks", []))
+        return res["status"]
     if tool == "write_file" and "AUTO_APPROVE.md" in params.get("path", ""):
          return "rejected"
     if tool == "execute_shell" and "rm -rf" in params.get("command", ""):
