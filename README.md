@@ -33,8 +33,12 @@ Hermes 是一個致力於提供高度可觀測、受控且安全的本地 AI 代
    cd hermes
    ```
 3. **啟動系統**:
-   直接執行根目錄下的 `RUN_HERMES.bat`。它會自動啟動後端並開啟瀏覽器。
-4. **進入儀表板**: 訪問 `http://localhost:8000/dashboard.html`。
+   - **本機啟動**: 直接執行根目錄下的 `RUN_HERMES.bat`。它會自動啟動後端並開啟瀏覽器。
+   - **沙盒安全啟動 (Docker)**: 一鍵建立完全物理隔離的 L5 自治環境：
+     ```bash
+     docker-compose up -d --build
+     ```
+4. **進入儀表板**: 訪問 `http://localhost:8000/dashboard.html`。[查看沙盒架構與安全細節](docs/docker_sandbox.md)
 
 ---
 

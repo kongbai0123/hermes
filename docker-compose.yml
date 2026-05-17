@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  hermes:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hermes_sandbox
+    ports:
+      - "8000:8000"
+    environment:
+      - HERMES_PORT=8000
+      - HERMES_WORKSPACE=/app
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    volumes:
+      - ./user_projects:/app/user_projects
+      - ./scratch:/app/scratch
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
