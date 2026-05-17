@@ -49,6 +49,7 @@ Hermes 目前已具備穩定的本地代理運作核心，支援以下能力：
 
 ### V0.5 規劃：產品級治理體驗 (In Progress)
 - [x] **寫入意圖分類修正**: 已解鎖「MCP + 生成」組合任務，確保正確導向受管寫入路徑 (Managed Write Path)。
+- [x] **Phase 6 Validation Suite**: `safety_validation_suite.json` 與自動化 L0–L5 合規測試（已就緒）。
 - [ ] **審核流程產品化**: 完善 Patch 與 Shell 的審核 UI/API 閉環。
 - [x] **Scoped 權限授權**: Patch approval 已支援 patch_id scoped filesystem_write grant 與 TTL；後續將補 Dashboard 顯示與 scoped-only enforcement。
 - [ ] **Trace Schema 標準化**: 穩定診斷資料格式，提升可觀測性。
