@@ -1,33 +1,37 @@
 # ==========================================
 # ⚡ Hermes Docker Sandbox Engine
 # ==========================================
-FROM python:3.12-slim
-
-# 安裝必要系統依賴
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+FROM python:3.11-slim
 
 # 設定環境變數
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    HERMES_WORKSPACE=/app \
-    HERMES_PORT=8000
+    HERMES_WORKSPACE=/workspace \
+    HERMES_AUTONOMY_LEVEL=L2
 
-WORKDIR /app
+# 建立一個非 root 使用者，確保 L5 腳本執行時的安全性
+RUN groupadd -r hermesgroup && useradd -r -g hermesgroup -d /workspace -s /bin/bash hermes
 
-# 複製專案檔案 (排除不需要的暫存檔)
-COPY . /app
+# 安裝基礎依賴 (如 git, curl)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# 建立 non-root 使用者以保證 Sandbox 內部安全邊界，符合 L5 安全限制
-RUN useradd -u 1000 -m hermes && \
-    chown -R hermes:hermes /app
+WORKDIR /workspace
 
+# 先複製 requirements 以利用 Docker 快取
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 複製專案原始碼
+COPY . .
+
+# 確保 hermes 使用者擁有資料夾權限
+RUN chown -R hermes:hermesgroup /workspace
+
+# 切換到非 root 使用者
 USER hermes
 
-# 暴露服務埠
-EXPOSE 8000
-
-# 啟動命令
-CMD ["python", "start_hermes.py"]
+# 預設執行 Validator 作為健康檢查或啟動 Agent API
+CMD ["python", "scripts/validate_autonomy.py", "--level", "ALL"]

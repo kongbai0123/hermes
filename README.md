@@ -44,20 +44,12 @@ Hermes 是一個致力於提供高度可觀測、受控且安全的本地 AI 代
 
 ## 🗺️ 專案進度與里程碑 (Status & Roadmap)
 
-### 目前狀態：V0.4-pre (Controlled Autonomous Runtime Kernel)
-Hermes 目前已具備穩定的本地代理運作核心，支援以下能力：
-- **自主循環**: 可進行多輪工具觀察與回饋，具備 `max_iterations` 截斷防止無限循環。
-- **治理診斷面板**: 右側 DECISION 面板可顯示 L1-L4 的即時治理鏈狀態與執行風險。
-- **受控寫入流程**: 已實作 `propose_patch` 與審核 API，寫入操作需經過 User Approval 與 Governance Gate。
-- **核心安全測試**: 完整行為測試覆蓋核心安全邊界。
-
 ### V0.5 規劃：產品級治理體驗 (In Progress)
-- [x] **寫入意圖分類修正**: 已解鎖「MCP + 生成」組合任務，確保正確導向受管寫入路徑 (Managed Write Path)。
-- [x] **Phase 6 Validation Suite**: `safety_validation_suite.json` 與自動化 L0–L5 合規測試（已就緒）。
-- [ ] **審核流程產品化**: 完善 Patch 與 Shell 的審核 UI/API 閉環。
-- [x] **Scoped 權限授權**: Patch approval 已支援 patch_id scoped filesystem_write grant 與 TTL；後續將補 Dashboard 顯示與 scoped-only enforcement。
-- [ ] **Trace Schema 標準化**: 穩定診斷資料格式，提升可觀測性。
-- [ ] **README / Demo 補完**: 提供完整的安裝指南與 Demo 任務說明。
+- [x] **Autonomy Policy (L0-L5)**: 建立明確的權限分層，嚴格禁止 Markdown 繞過底層防護。
+- [x] **Phase 6: Validation Suite**: 完成 `safety_validation_suite.json`，提供資料驅動的安全邊界白箱/黑箱自動化測試。
+- [x] **Phase 3: Tool Failure Backoff**: 實作連續錯誤退避機制（暫停並請求人工介入），防止 Agent 暴走，具備強大的 Fail-safe 能力。
+- [x] **Phase 4: Docker Sandbox**: 導入實體與邏輯雙層防禦（Defense in Depth），透過 non-root user 與資源限制打造安全的 L5 實驗環境。[查看沙盒詳細架構](docs/docker_sandbox.md)
+- [ ] **Phase 5: Skill Curator (Next)**: 實作基於 Trace 與 Proposal-only 的自我進化學習機制。
 
 ---
 

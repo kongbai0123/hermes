@@ -5,18 +5,29 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: hermes_sandbox
-    ports:
-      - "8000:8000"
-    environment:
-      - HERMES_PORT=8000
-      - HERMES_WORKSPACE=/app
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
-    volumes:
-      - ./user_projects:/app/user_projects
-      - ./scratch:/app/scratch
+    container_name: hermes-sandbox
+    # 針對 Linux 系統，確保 host.docker.internal 可以解析到本機的 Ollama
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
+    # 設定環境變數與路由
+    environment:
+      # 指向本機的 Ollama 服務
+      - HERMES_OLLAMA_BASE_URL=http://host.docker.internal:11434
+      # 可在 docker-compose 階段覆寫自治等級 (例如啟動 L5 實驗環境)
+      - HERMES_AUTONOMY_LEVEL=L5
+      - HERMES_WORKSPACE=/workspace
+    # 掛載卷以進行持久化
+    volumes:
+      # 僅掛載需要持久化的目錄，隔離核心程式碼防止竄改
+      - ./user_projects:/workspace/user_projects
+      - ./docs:/workspace/docs
+      - ./tests/fixtures:/workspace/tests/fixtures:ro # 測試案例設為唯讀
+    # 資源配額與硬體限制
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'       # 限制 CPU 使用率，防止惡意腳本癱瘓宿主機
+          memory: 2G        # 限制記憶體，防止 OOM (Out of Memory)
+        reservations:
+          cpus: '0.5'
+          memory: 512M

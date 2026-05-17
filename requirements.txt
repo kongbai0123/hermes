@@ -1,0 +1,1 @@
+# Hermes OS has zero-dependencies. All core logic uses the Python standard library.
