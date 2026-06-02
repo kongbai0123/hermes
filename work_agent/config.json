@@ -1,0 +1,13 @@
+{
+  "model": "gemma4:latest",
+  "ollama_url": "http://localhost:11434/api/chat",
+  "workspace": "workspace",
+  "max_steps": 4,
+  "allowed_commands": [
+    "python --version",
+    "python -m pytest",
+    "pytest",
+    "rg"
+  ]
+}
+

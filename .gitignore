@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build and packaged outputs
+dist/
+**/dist/
+build/
+**/build/
+*.exe
+*.zip
+
+# Python cache and virtual environments
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+**/.pytest_cache/
+.venv/
+venv/
+env/
+
+# Logs and temp files
+logs/
+**/logs/
+*.log
+tmp/
+temp/
+test-results/
+**/test-results/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Generated smoke-test screenshots
+smoke-*.png
+preview.png
+
+# Platform-generated public metadata
+**/client/public/__manus__/

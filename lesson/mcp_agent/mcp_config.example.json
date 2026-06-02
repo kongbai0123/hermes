@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "local-agent-tutor": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "G:\\program\\LocalAgentTutor_MCP_Package\\mcp_agent\\run_mcp_server.cmd"
+      ],
+      "env": {
+        "LOCAL_AGENT_TUTOR_ROOT": "G:\\program\\LocalAgentTutor_MCP_Package"
+      }
+    }
+  }
+}
