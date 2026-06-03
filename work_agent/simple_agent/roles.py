@@ -25,13 +25,14 @@ class ManagerModel:
             "你是 Manager Model。請把使用者任務轉成簡單決策。\n"
             "只能輸出 JSON，不要 markdown。\n"
             "JSON 格式：{\"plan\":\"...\",\"worker\":\"file|search|test|explain\","
-            "\"tool\":\"list_files|read_file|search_text|run_command|proxy_fetch|none\","
-            "\"args\":{\"path\":\"...\",\"keyword\":\"...\",\"command\":\"...\",\"url\":\"...\"}}\n"
+            "\"tool\":\"list_files|read_file|search_text|run_command|proxy_fetch|open_browser|none\","
+            "\"args\":{\"path\":\"...\",\"keyword\":\"...\",\"command\":\"...\",\"url\":\"...\",\"browser\":\"chrome\"}}\n"
             "若使用者要看結構，用 list_files。若要讀檔，用 read_file。"
             "若要找關鍵字，用 search_text。若要跑測試或版本，用 run_command。"
             "若使用者明確要求網路 proxy 或抓取外部 URL，用 proxy_fetch，args 必須包含 url。"
             "proxy_fetch 仍會經過 Policy Gate 與 allowlist，不可承諾一定能執行。"
-            "目前沒有 Browser 操作工具；若任務需要瀏覽器點擊，tool 請選 none。"
+            "若使用者要求開啟 Chrome 或瀏覽器網址，用 open_browser，args 必須包含 url 與 browser。"
+            "open_browser 只能開啟設定檔 allowlist 允許的公開網域。"
         )
         try:
             raw = self.llm.chat(
@@ -64,6 +65,17 @@ class ManagerModel:
         if any(word in text for word in ["測試", "pytest", "執行", "version"]):
             command = "python --version" if "version" in text else "pytest"
             return ManagerDecision("執行白名單命令。", "test", "run_command", {"command": command})
+        if any(word in text for word in ["chrome", "browser", "瀏覽器", "youtube", "開啟網頁", "打開網頁"]):
+            url_match = re.search(r"https?://\S+", user_text)
+            url = url_match.group(0).rstrip("。.,，") if url_match else ""
+            if not url and "youtube" in text:
+                url = "https://www.youtube.com"
+            return ManagerDecision(
+                "使用 open_browser 讓 Chrome 開啟使用者指定的公開網頁。",
+                "browser",
+                "open_browser",
+                {"url": url, "browser": "chrome"},
+            )
         if any(word in text for word in ["代理", "proxy", "api", "網路請求", "爬取", "抓取"]):
             url_match = re.search(r"https?://\S+", user_text)
             url = url_match.group(0).rstrip("。.,，") if url_match else ""

@@ -21,6 +21,9 @@ DEFAULT_CONFIG = {
         "rg",
     ],
     "allowed_proxy_domains": [],
+    "allowed_browser_domains": [
+        "youtube.com"
+    ],
 }
 
 

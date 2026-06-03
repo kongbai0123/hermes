@@ -5,6 +5,8 @@ import shlex
 import subprocess
 import ipaddress
 import socket
+import sys
+import webbrowser
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -31,11 +33,15 @@ class ToolBox:
         *,
         allowed_proxy_domains: list[str] | None = None,
         proxy_fetcher: Callable[[str, int, int], str] | None = None,
+        allowed_browser_domains: list[str] | None = None,
+        browser_opener: Callable[[str, str], None] | None = None,
     ) -> None:
         self.workspace = Path(workspace_path).resolve()
         self.allowed_commands = allowed_commands
         self.allowed_proxy_domains = [domain.lower() for domain in (allowed_proxy_domains or [])]
         self.proxy_fetcher = proxy_fetcher or self._default_proxy_fetcher
+        self.allowed_browser_domains = [domain.lower() for domain in (allowed_browser_domains or [])]
+        self.browser_opener = browser_opener or self._default_browser_opener
         self.workspace.mkdir(parents=True, exist_ok=True)
 
     def _safe_path(self, path: str) -> Path:
@@ -138,7 +144,7 @@ class ToolBox:
             return Observation(False, "run_command", str(exc))
 
     def proxy_fetch(self, url: str, timeout: int | str = 10, max_bytes: int | str = 65536) -> Observation:
-        validation_error = self._validate_proxy_url(url)
+        validation_error = self._validate_url(url, self.allowed_proxy_domains, "proxy_fetch")
         if validation_error:
             return Observation(False, "proxy_fetch", validation_error)
 
@@ -154,22 +160,36 @@ class ToolBox:
         except Exception as exc:
             return Observation(False, "proxy_fetch", str(exc))
 
-    def _validate_proxy_url(self, url: str) -> str | None:
+    def open_browser(self, url: str, browser: str = "chrome") -> Observation:
+        validation_error = self._validate_url(url, self.allowed_browser_domains, "open_browser")
+        if validation_error:
+            return Observation(False, "open_browser", validation_error)
+
+        safe_browser = browser.strip().lower() or "chrome"
+        if safe_browser not in {"chrome", "default"}:
+            return Observation(False, "open_browser", "open_browser 目前只允許 chrome 或 default。")
+        try:
+            self.browser_opener(url, safe_browser)
+            return Observation(True, "open_browser", f"已請 {safe_browser} 開啟：{url}")
+        except Exception as exc:
+            return Observation(False, "open_browser", str(exc))
+
+    def _validate_url(self, url: str, allowed_domains: list[str], tool_name: str) -> str | None:
         parsed = urlparse(url)
         if parsed.scheme not in {"http", "https"}:
-            return "proxy_fetch 只允許 http 或 https URL。"
+            return f"{tool_name} 只允許 http 或 https URL。"
         if not parsed.hostname:
-            return "proxy_fetch 需要有效的 hostname。"
+            return f"{tool_name} 需要有效的 hostname。"
 
         host = parsed.hostname.lower()
         if self._is_internal_host(host):
-            return "拒絕透過 proxy_fetch 存取 localhost、內網或保留位址。"
-        if not self._is_proxy_domain_allowed(host):
-            return f"proxy_fetch domain 不在 allowlist 內：{host}"
+            return f"拒絕透過 {tool_name} 存取 localhost、內網或保留位址。"
+        if not self._is_domain_allowed(host, allowed_domains):
+            return f"{tool_name} domain 不在 allowlist 內：{host}"
         return None
 
-    def _is_proxy_domain_allowed(self, host: str) -> bool:
-        for domain in self.allowed_proxy_domains:
+    def _is_domain_allowed(self, host: str, allowed_domains: list[str]) -> bool:
+        for domain in allowed_domains:
             if host == domain or host.endswith(f".{domain}"):
                 return True
         return False
@@ -221,6 +241,26 @@ class ToolBox:
             text += "\n...(已截斷)"
         return text
 
+    def _default_browser_opener(self, url: str, browser: str) -> None:
+        if browser == "chrome":
+            if sys.platform.startswith("win"):
+                completed = subprocess.run(
+                    ["cmd", "/c", "start", "", "chrome", url],
+                    cwd=self.workspace,
+                    shell=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                if completed.returncode == 0:
+                    return
+            try:
+                webbrowser.get("chrome").open(url, new=2)
+                return
+            except webbrowser.Error:
+                pass
+        webbrowser.open(url, new=2)
+
     def _is_allowed(self, command: str) -> bool:
         for allowed in self.allowed_commands:
             if command == allowed or command.startswith(allowed + " "):
@@ -242,4 +282,6 @@ class ToolBox:
                 kwargs.get("timeout", "10"),
                 kwargs.get("max_bytes", "65536"),
             )
+        if name == "open_browser":
+            return self.open_browser(kwargs.get("url", ""), kwargs.get("browser", "chrome"))
         return Observation(False, name, "未知工具。")

@@ -21,8 +21,13 @@ class FakeWorker:
         return f"{decision.tool}: {observation.format()}"
 
 
-def make_controller(workspace: Path, decisions: list[ManagerDecision]) -> BoundedLoopController:
-    tools = ToolBox(str(workspace), ["python --version"])
+def make_controller(
+    workspace: Path,
+    decisions: list[ManagerDecision],
+    *,
+    tools: ToolBox | None = None,
+) -> BoundedLoopController:
+    tools = tools or ToolBox(str(workspace), ["python --version"])
     return BoundedLoopController(
         FakeManager(decisions),  # type: ignore[arg-type]
         FakeWorker(),  # type: ignore[arg-type]
@@ -83,6 +88,41 @@ def test_bounded_loop_requires_approval_for_proxy_fetch(tmp_path: Path) -> None:
     assert result["stop_reason"] == "NEEDS_USER_APPROVAL"
     assert result["trace"][0]["policy"]["risk"] == "network"
     assert result["trace"][0]["policy"]["decision"] == "approval_required"
+
+
+def test_bounded_loop_allows_open_browser_tool(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    opened: list[tuple[str, str]] = []
+
+    def fake_opener(url: str, browser: str) -> None:
+        opened.append((url, browser))
+
+    tools = ToolBox(
+        str(workspace),
+        ["python --version"],
+        allowed_browser_domains=["youtube.com"],
+        browser_opener=fake_opener,
+    )
+    controller = make_controller(
+        workspace,
+        [
+            ManagerDecision(
+                "Open YouTube in Chrome.",
+                "browser",
+                "open_browser",
+                {"url": "https://www.youtube.com", "browser": "chrome"},
+            )
+        ],
+        tools=tools,
+    )
+
+    result = controller.run("open youtube in chrome")
+
+    assert result["stop_reason"] == "DONE"
+    assert result["trace"][0]["policy"]["risk"] == "browser"
+    assert result["trace"][0]["policy"]["decision"] == "allow"
+    assert opened == [("https://www.youtube.com", "chrome")]
 
 
 def test_bounded_loop_rejects_destructive_request(tmp_path: Path) -> None:

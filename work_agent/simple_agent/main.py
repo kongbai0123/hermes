@@ -17,6 +17,7 @@ def build_agent(model_override: str | None = None) -> AgentLoop:
         config["workspace_path"],
         config["allowed_commands"],
         allowed_proxy_domains=list(config.get("allowed_proxy_domains", [])),
+        allowed_browser_domains=list(config.get("allowed_browser_domains", [])),
     )
     limits = LoopLimits(
         max_steps=int(config.get("max_steps", 6)),

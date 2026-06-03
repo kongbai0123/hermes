@@ -75,3 +75,34 @@ def test_proxy_fetch_execute_reports_invalid_numeric_args(tmp_path: Path) -> Non
 
     assert result.ok is False
     assert "timeout" in result.content
+
+
+def test_open_browser_uses_registered_opener_for_allowlisted_domain(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    opened: list[tuple[str, str]] = []
+
+    def fake_opener(url: str, browser: str) -> None:
+        opened.append((url, browser))
+
+    tools = ToolBox(
+        str(workspace),
+        ["python --version"],
+        allowed_browser_domains=["youtube.com"],
+        browser_opener=fake_opener,
+    )
+
+    result = tools.open_browser("https://www.youtube.com", browser="chrome")
+
+    assert result.ok is True
+    assert opened == [("https://www.youtube.com", "chrome")]
+    assert "chrome" in result.content.lower()
+
+
+def test_open_browser_rejects_localhost_even_when_allowlisted(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    tools = ToolBox(str(workspace), ["python --version"], allowed_browser_domains=["localhost"])
+
+    result = tools.open_browser("http://localhost:3000", browser="chrome")
+
+    assert result.ok is False
+    assert "內網" in result.content

@@ -40,6 +40,7 @@ def generate_patch(prompt: str, path: str, model_override: str | None = None) ->
         config["workspace_path"],
         config["allowed_commands"],
         allowed_proxy_domains=list(config.get("allowed_proxy_domains", [])),
+        allowed_browser_domains=list(config.get("allowed_browser_domains", [])),
     )
     observation = tools.read_file(path)
     if not observation.ok:

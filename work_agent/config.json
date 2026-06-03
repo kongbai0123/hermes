@@ -13,5 +13,8 @@
     "pytest",
     "rg"
   ],
-  "allowed_proxy_domains": []
+  "allowed_proxy_domains": [],
+  "allowed_browser_domains": [
+    "youtube.com"
+  ]
 }
