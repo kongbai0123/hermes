@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   ChevronRight,
   Eye,
-  FileSearch,
   GitBranch,
   Route,
   ShieldCheck,
@@ -14,6 +13,37 @@ import {
 } from "lucide-react";
 import { useChat } from "@/contexts/ChatContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+
+const DESIGN_TOKENS = {
+  colors: {
+    canvasBg: "#0A0D14",
+    nodeBgDefault: "#141923",
+    nodeBgHover: "#1A2332",
+    borderDefault: "#222A3A",
+    borderIdle: "#3A4556",
+    borderActive: "#3B82F6",
+    borderSuccess: "#00E5A3",
+    borderError: "#EF4444",
+    textPrimary: "#FFFFFF",
+    textSecondary: "#64748B",
+    lineIdle: "#3A4556",
+    lineActive: "#3B82F6",
+    lineSuccess: "#00E5A3",
+    lineError: "#EF4444",
+    iconIdle: "#64748B",
+    iconActive: "#3B82F6",
+    iconSuccess: "#00E5A3",
+    iconError: "#EF4444",
+  },
+  node: {
+    width: 180,
+    height: 72,
+    borderRadius: 8,
+  },
+};
+
+const MIN_PANEL_WIDTH = 420;
+const MAX_PANEL_WIDTH = 1100;
 
 type FlowNodeId =
   | "user"
@@ -27,108 +57,118 @@ type FlowNodeId =
   | "final";
 type FlowNodeState = "idle" | "active" | "complete" | "error";
 
-interface FlowNode {
+interface NodeCoord {
   id: FlowNodeId;
-  icon: typeof UserRound;
-  titleKey: string;
-  subtitleKey: string;
   x: number;
   y: number;
-  width?: string;
+  icon: typeof UserRound;
+  titleKey: string;
+  fallbackTitle: string;
+  fallbackSubtitle: string;
 }
 
-const MIN_PANEL_WIDTH = 340;
-const MAX_PANEL_WIDTH = 680;
+interface Connection {
+  from: FlowNodeId;
+  to: FlowNodeId;
+  type: "vertical" | "horizontal" | "diagonal";
+}
 
-const nodes: FlowNode[] = [
+const NODE_COORDINATES: NodeCoord[] = [
   {
     id: "user",
+    x: 500,
+    y: 80,
     icon: UserRound,
     titleKey: "flow.user.title",
-    subtitleKey: "flow.user.subtitle",
-    x: 50,
-    y: 8,
+    fallbackTitle: "User Input",
+    fallbackSubtitle: "用戶輸入",
   },
   {
     id: "controller",
+    x: 500,
+    y: 200,
     icon: Route,
     titleKey: "flow.controller.title",
-    subtitleKey: "flow.controller.subtitle",
-    x: 50,
-    y: 22,
-    width: "w-48",
+    fallbackTitle: "Controller",
+    fallbackSubtitle: "流程控制",
   },
   {
     id: "planner",
+    x: 280,
+    y: 340,
     icon: GitBranch,
     titleKey: "flow.planner.title",
-    subtitleKey: "flow.planner.subtitle",
-    x: 28,
-    y: 38,
+    fallbackTitle: "Planner",
+    fallbackSubtitle: "計畫生成",
   },
   {
     id: "processor",
+    x: 720,
+    y: 340,
     icon: Bot,
     titleKey: "flow.processor.title",
-    subtitleKey: "flow.processor.subtitle",
-    x: 72,
-    y: 38,
+    fallbackTitle: "Processor",
+    fallbackSubtitle: "處理器",
   },
   {
     id: "policy",
+    x: 400,
+    y: 500,
     icon: ShieldCheck,
     titleKey: "flow.policy.title",
-    subtitleKey: "flow.policy.subtitle",
-    x: 28,
-    y: 56,
+    fallbackTitle: "Policy",
+    fallbackSubtitle: "策略驗證",
   },
   {
     id: "executor",
+    x: 600,
+    y: 500,
     icon: Wrench,
     titleKey: "flow.executor.title",
-    subtitleKey: "flow.executor.subtitle",
-    x: 72,
-    y: 56,
-  },
-  {
-    id: "observation",
-    icon: Eye,
-    titleKey: "flow.observation.title",
-    subtitleKey: "flow.observation.subtitle",
-    x: 72,
-    y: 73,
+    fallbackTitle: "Executor",
+    fallbackSubtitle: "執行器",
   },
   {
     id: "energy",
+    x: 400,
+    y: 680,
     icon: Activity,
     titleKey: "flow.energy.title",
-    subtitleKey: "flow.energy.subtitle",
-    x: 28,
-    y: 73,
+    fallbackTitle: "Energy",
+    fallbackSubtitle: "能量監控",
+  },
+  {
+    id: "observation",
+    x: 600,
+    y: 680,
+    icon: Eye,
+    titleKey: "flow.observation.title",
+    fallbackTitle: "Observation",
+    fallbackSubtitle: "觀察反饋",
   },
   {
     id: "final",
+    x: 500,
+    y: 880,
     icon: CheckCircle2,
     titleKey: "flow.final.title",
-    subtitleKey: "flow.final.subtitle",
-    x: 50,
-    y: 90,
+    fallbackTitle: "Final Output",
+    fallbackSubtitle: "最終輸出",
   },
 ];
 
-const paths = [
-  { from: "50,12", to: "50,18" },
-  { from: "45,27", to: "32,34" },
-  { from: "55,27", to: "68,34" },
-  { from: "28,43", to: "28,51" },
-  { from: "40,56", to: "60,56" },
-  { from: "72,61", to: "72,68" },
-  { from: "60,73", to: "40,73" },
-  { from: "28,68", to: "28,61" },
-  { from: "37,78", to: "47,86" },
-  { from: "63,78", to: "53,86" },
-  { from: "25,70", to: "22,42", dash: true },
-  { from: "75,70", to: "78,42", dash: true },
+const CONNECTIONS: Connection[] = [
+  { from: "user", to: "controller", type: "vertical" },
+  { from: "controller", to: "planner", type: "diagonal" },
+  { from: "controller", to: "processor", type: "diagonal" },
+  { from: "planner", to: "policy", type: "diagonal" },
+  { from: "processor", to: "executor", type: "diagonal" },
+  { from: "policy", to: "executor", type: "horizontal" },
+  { from: "executor", to: "observation", type: "vertical" },
+  { from: "observation", to: "energy", type: "horizontal" },
+  { from: "energy", to: "policy", type: "vertical" },
+  { from: "observation", to: "final", type: "diagonal" },
+  { from: "energy", to: "final", type: "diagonal" },
 ];
 
 interface AgentFlowPanelProps {
@@ -139,7 +179,8 @@ interface AgentFlowPanelProps {
 export default function AgentFlowPanel({ isOpen, onClose }: AgentFlowPanelProps) {
   const { currentChat } = useChat();
   const { t } = useLanguage();
-  const [panelWidth, setPanelWidth] = useState(430);
+  const [hoveredNode, setHoveredNode] = useState<FlowNodeId | null>(null);
+  const [panelWidth, setPanelWidth] = useState(620);
   const [isResizing, setIsResizing] = useState(false);
 
   const nodeStates = useMemo(() => getNodeStates(currentChat?.workbench), [currentChat]);
@@ -158,6 +199,7 @@ export default function AgentFlowPanel({ isOpen, onClose }: AgentFlowPanelProps)
       );
       setPanelWidth(nextWidth);
     };
+
     const handleUp = () => {
       setIsResizing(false);
       window.removeEventListener("pointermove", handleMove);
@@ -170,95 +212,206 @@ export default function AgentFlowPanel({ isOpen, onClose }: AgentFlowPanelProps)
 
   return (
     <div className="pointer-events-none fixed right-0 top-16 z-40">
+      <style>{`
+        @keyframes flow-node-glow {
+          0%, 100% {
+            filter: drop-shadow(0 0 0 rgba(59, 130, 246, 0.25));
+          }
+          50% {
+            filter: drop-shadow(0 0 14px rgba(59, 130, 246, 0.62));
+          }
+        }
+
+        @keyframes flow-particle {
+          0% { offset-distance: 0%; opacity: 0; }
+          10% { opacity: 0.85; }
+          90% { opacity: 0.85; }
+          100% { offset-distance: 100%; opacity: 0; }
+        }
+
+        @keyframes icon-pulse {
+          0%, 100% { opacity: 0.78; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.08); }
+        }
+
+        .agent-flow-redesign .node-active-rect {
+          animation: flow-node-glow 2s ease-in-out infinite;
+        }
+
+        .agent-flow-redesign .node-active-icon {
+          animation: icon-pulse 2s ease-in-out infinite;
+          transform-origin: center;
+        }
+
+        .agent-flow-redesign .flow-particle {
+          animation: flow-particle 3200ms linear infinite;
+          offset-path: var(--path);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .agent-flow-redesign .node-active-rect,
+          .agent-flow-redesign .node-active-icon,
+          .agent-flow-redesign .flow-particle {
+            animation: none;
+          }
+        }
+      `}</style>
+
       <aside
-        className={`pointer-events-auto relative h-[calc(100vh-6rem)] border-l border-border bg-background/98 shadow-2xl transition-transform duration-300 ${
+        className={`agent-flow-redesign pointer-events-auto relative h-[calc(100vh-6rem)] border-l border-slate-700/40 shadow-2xl transition-transform duration-300 ${
           isOpen ? "translate-x-0" : "translate-x-full"
         } ${isResizing ? "select-none" : ""}`}
-        style={{ width: `${panelWidth}px` }}
+        style={{
+          width: `${panelWidth}px`,
+          backgroundColor: DESIGN_TOKENS.colors.canvasBg,
+        }}
       >
         <button
           type="button"
           aria-label={t("flow.resize")}
           title={t("flow.resize")}
           onPointerDown={handleResizeStart}
-          className="absolute -left-2 top-0 z-10 h-full w-4 cursor-col-resize border-x border-transparent hover:border-primary/40"
+          className="absolute -left-2 top-0 z-10 h-full w-4 cursor-col-resize border-x border-transparent hover:border-blue-500/40"
         >
-          <span className="mx-auto block h-full w-px bg-border" />
+          <span className="mx-auto block h-full w-px bg-slate-700/70" />
         </button>
 
         <div className="flex h-full flex-col">
-          <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <div className="min-w-0">
-              <h2 className="truncate text-sm font-semibold">{t("flow.title")}</h2>
-              <p className="truncate text-xs text-muted-foreground">{t(currentStage)}</p>
+          <div
+            className="border-b px-6 py-5 backdrop-blur-sm"
+            style={{
+              borderColor: DESIGN_TOKENS.colors.borderDefault,
+              backgroundColor: `${DESIGN_TOKENS.colors.nodeBgDefault}cc`,
+            }}
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <h2
+                  className="truncate text-lg font-bold tracking-wider"
+                  style={{ color: DESIGN_TOKENS.colors.textPrimary }}
+                >
+                  AGENT FLOW
+                </h2>
+                <p
+                  className="mt-2 truncate text-xs"
+                  style={{ color: DESIGN_TOKENS.colors.textSecondary }}
+                >
+                  {t(currentStage)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded p-1.5 transition-all duration-200 hover:bg-slate-800"
+                style={{ color: DESIGN_TOKENS.colors.textSecondary }}
+                title={t("flow.hide")}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-md p-2 text-muted-foreground hover:bg-secondary hover:text-foreground"
-              title={t("flow.hide")}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="relative h-[640px] rounded-md border border-border bg-card">
-              <svg
-                className="absolute inset-0 h-full w-full"
-                viewBox="0 0 100 100"
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                <defs>
-                  <marker
-                    id="flow-arrow"
-                    markerWidth="6"
-                    markerHeight="6"
-                    refX="5"
-                    refY="3"
-                    orient="auto"
-                    markerUnits="strokeWidth"
-                  >
-                    <path d="M0,0 L6,3 L0,6 Z" className="fill-primary/60" />
-                  </marker>
-                </defs>
-                {paths.map((path) => (
-                  <line
-                    key={`${path.from}-${path.to}`}
-                    x1={path.from.split(",")[0]}
-                    y1={path.from.split(",")[1]}
-                    x2={path.to.split(",")[0]}
-                    y2={path.to.split(",")[1]}
-                    className="stroke-primary/45"
-                    strokeDasharray={path.dash ? "3 3" : undefined}
-                    strokeWidth="0.9"
-                    markerEnd="url(#flow-arrow)"
-                  />
-                ))}
-              </svg>
+          <div className="flex-1 overflow-auto p-6">
+            <svg
+              width="100%"
+              height="1040"
+              viewBox="0 0 1000 1040"
+              preserveAspectRatio="xMidYMin meet"
+              style={{
+                minWidth: "880px",
+                backgroundColor: DESIGN_TOKENS.colors.canvasBg,
+                borderRadius: "8px",
+              }}
+              aria-label={t("flow.title")}
+            >
+              <defs>
+                <marker
+                  id="agent-flow-arrow-idle"
+                  markerWidth="10"
+                  markerHeight="10"
+                  refX="8"
+                  refY="3"
+                  orient="auto"
+                >
+                  <polygon points="0 0, 10 3, 0 6" fill={DESIGN_TOKENS.colors.lineIdle} />
+                </marker>
+                <marker
+                  id="agent-flow-arrow-active"
+                  markerWidth="10"
+                  markerHeight="10"
+                  refX="8"
+                  refY="3"
+                  orient="auto"
+                >
+                  <polygon points="0 0, 10 3, 0 6" fill={DESIGN_TOKENS.colors.lineActive} />
+                </marker>
+                <marker
+                  id="agent-flow-arrow-success"
+                  markerWidth="10"
+                  markerHeight="10"
+                  refX="8"
+                  refY="3"
+                  orient="auto"
+                >
+                  <polygon points="0 0, 10 3, 0 6" fill={DESIGN_TOKENS.colors.lineSuccess} />
+                </marker>
+                <marker
+                  id="agent-flow-arrow-error"
+                  markerWidth="10"
+                  markerHeight="10"
+                  refX="8"
+                  refY="3"
+                  orient="auto"
+                >
+                  <polygon points="0 0, 10 3, 0 6" fill={DESIGN_TOKENS.colors.lineError} />
+                </marker>
+              </defs>
 
-              {nodes.map((node) => (
-                <FlowNodeCard
-                  key={node.id}
-                  node={node}
-                  state={nodeStates[node.id]}
-                  title={t(node.titleKey)}
-                  subtitle={t(node.subtitleKey)}
+              {CONNECTIONS.map((connection) => (
+                <FlowConnection
+                  key={`${connection.from}-${connection.to}`}
+                  connection={connection}
+                  nodeStates={nodeStates}
                 />
               ))}
-            </div>
 
-            <div className="mt-4 rounded-md border border-border bg-card p-3">
-              <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-                <FileSearch className="h-4 w-4 text-primary" />
-                {t("flow.legend.title")}
-              </div>
-              <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
-                <span className="rounded bg-secondary px-2 py-1">{t("flow.legend.dim")}</span>
-                <span className="rounded bg-primary/10 px-2 py-1 text-primary">{t("flow.legend.active")}</span>
-                <span className="rounded bg-emerald-500/10 px-2 py-1 text-emerald-600">{t("flow.legend.done")}</span>
-              </div>
+              {NODE_COORDINATES.map((node) => (
+                <g
+                  key={node.id}
+                  onMouseEnter={() => setHoveredNode(node.id)}
+                  onMouseLeave={() => setHoveredNode(null)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <FlowNodeSvg
+                    node={node}
+                    state={nodeStates[node.id]}
+                    isHovered={hoveredNode === node.id}
+                    title={t(node.titleKey)}
+                    subtitle={node.fallbackSubtitle}
+                  />
+                </g>
+              ))}
+            </svg>
+          </div>
+
+          <div
+            className="border-t px-6 py-4"
+            style={{
+              borderColor: DESIGN_TOKENS.colors.borderDefault,
+              backgroundColor: `${DESIGN_TOKENS.colors.nodeBgDefault}cc`,
+            }}
+          >
+            <div
+              className="mb-3 text-xs font-semibold"
+              style={{ color: DESIGN_TOKENS.colors.textSecondary }}
+            >
+              {t("flow.legend.title")}
+            </div>
+            <div className="grid grid-cols-4 gap-3 text-xs">
+              <LegendItem color={DESIGN_TOKENS.colors.borderIdle} label={t("flow.legend.dim")} />
+              <LegendItem color={DESIGN_TOKENS.colors.borderActive} label={t("flow.legend.active")} />
+              <LegendItem color={DESIGN_TOKENS.colors.borderSuccess} label={t("flow.legend.done")} />
+              <LegendItem color={DESIGN_TOKENS.colors.borderError} label="Error" />
             </div>
           </div>
         </div>
@@ -267,50 +420,216 @@ export default function AgentFlowPanel({ isOpen, onClose }: AgentFlowPanelProps)
   );
 }
 
-function FlowNodeCard({
+function FlowConnection({
+  connection,
+  nodeStates,
+}: {
+  connection: Connection;
+  nodeStates: Record<FlowNodeId, FlowNodeState>;
+}) {
+  const fromNode = NODE_COORDINATES.find((node) => node.id === connection.from);
+  const toNode = NODE_COORDINATES.find((node) => node.id === connection.to);
+  if (!fromNode || !toNode) return null;
+
+  const fromState = nodeStates[connection.from];
+  const toState = nodeStates[connection.to];
+  const isActive = fromState === "active" || toState === "active";
+  const isComplete = fromState === "complete" && toState === "complete";
+  const isError = fromState === "error" || toState === "error";
+  const pathD = calculateBezierPath(fromNode, toNode, connection.type);
+  const lineColor = isError
+    ? DESIGN_TOKENS.colors.lineError
+    : isActive
+      ? DESIGN_TOKENS.colors.lineActive
+      : isComplete
+        ? DESIGN_TOKENS.colors.lineSuccess
+        : DESIGN_TOKENS.colors.lineIdle;
+  const markerId = isError
+    ? "agent-flow-arrow-error"
+    : isActive
+      ? "agent-flow-arrow-active"
+      : isComplete
+        ? "agent-flow-arrow-success"
+        : "agent-flow-arrow-idle";
+
+  return (
+    <g>
+      <path
+        d={pathD}
+        fill="none"
+        stroke={lineColor}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={isActive ? 2.2 : 1.5}
+        markerEnd={`url(#${markerId})`}
+        opacity={isActive || isComplete || isError ? 1 : 0.55}
+        style={{ transition: "stroke 200ms cubic-bezier(0.4, 0, 0.2, 1)" }}
+      />
+
+      {isActive && (
+        <circle
+          r="3"
+          fill={DESIGN_TOKENS.colors.lineActive}
+          opacity="0.75"
+          className="flow-particle"
+          style={{ "--path": `path('${pathD}')` } as React.CSSProperties}
+        />
+      )}
+    </g>
+  );
+}
+
+function FlowNodeSvg({
   node,
   state,
+  isHovered,
   title,
   subtitle,
 }: {
-  node: FlowNode;
+  node: NodeCoord;
   state: FlowNodeState;
+  isHovered: boolean;
   title: string;
   subtitle: string;
 }) {
+  const { width, height } = DESIGN_TOKENS.node;
   const Icon = node.icon;
-  const active = state === "active";
-  const complete = state === "complete";
-  const error = state === "error";
+
+  let borderColor = DESIGN_TOKENS.colors.borderIdle;
+  let bgColor = DESIGN_TOKENS.colors.nodeBgDefault;
+  let textColor = DESIGN_TOKENS.colors.textSecondary;
+  let iconColor = DESIGN_TOKENS.colors.iconIdle;
+  let opacity = 0.45;
+  let shadowFilter = "none";
+
+  if (state === "active") {
+    borderColor = DESIGN_TOKENS.colors.borderActive;
+    bgColor = DESIGN_TOKENS.colors.nodeBgHover;
+    textColor = DESIGN_TOKENS.colors.textPrimary;
+    iconColor = DESIGN_TOKENS.colors.iconActive;
+    opacity = 1;
+    shadowFilter = "drop-shadow(0 0 12px rgba(59, 130, 246, 0.4))";
+  } else if (state === "complete") {
+    borderColor = DESIGN_TOKENS.colors.borderSuccess;
+    textColor = DESIGN_TOKENS.colors.textPrimary;
+    iconColor = DESIGN_TOKENS.colors.iconSuccess;
+    opacity = 1;
+  } else if (state === "error") {
+    borderColor = DESIGN_TOKENS.colors.borderError;
+    bgColor = DESIGN_TOKENS.colors.nodeBgHover;
+    textColor = DESIGN_TOKENS.colors.textPrimary;
+    iconColor = DESIGN_TOKENS.colors.iconError;
+    opacity = 1;
+  }
+
+  if (isHovered && state === "idle") {
+    opacity = 0.78;
+    bgColor = DESIGN_TOKENS.colors.nodeBgHover;
+  }
 
   return (
-    <div
-      className={`agent-flow-node absolute ${node.width ?? "w-40"} rounded-md border bg-background p-3 shadow-sm ${
-        active ? "agent-flow-node-active border-primary text-foreground" : ""
-      } ${complete ? "border-emerald-500/40 text-foreground" : ""} ${
-        error ? "agent-flow-node-error border-destructive text-foreground" : ""
-      } ${state === "idle" ? "opacity-35 grayscale" : ""}`}
-      style={{ left: `${node.x}%`, top: `${node.y}%` }}
+    <g
+      opacity={opacity}
+      style={{
+        filter: shadowFilter,
+        transition: "filter 200ms cubic-bezier(0.4, 0, 0.2, 1), opacity 200ms",
+      }}
     >
-      <div className="flex items-center gap-2">
+      <rect
+        x={node.x}
+        y={node.y}
+        width={width}
+        height={height}
+        rx={DESIGN_TOKENS.node.borderRadius}
+        fill={bgColor}
+        stroke={borderColor}
+        strokeWidth="1.5"
+        className={state === "active" ? "node-active-rect" : ""}
+      />
+
+      <circle cx={node.x + 24} cy={node.y + height / 2} r="14" fill={`${iconColor}18`} />
+
+      <foreignObject x={node.x + 10} y={node.y + height / 2 - 10} width="28" height="28">
         <div
-          className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md ${
-            error
-              ? "bg-destructive/10 text-destructive"
-              : complete
-                ? "bg-emerald-500/10 text-emerald-600"
-                : "bg-primary/10 text-primary"
-          }`}
+          className={state === "active" ? "node-active-icon" : ""}
+          style={{
+            alignItems: "center",
+            color: iconColor,
+            display: "flex",
+            height: "100%",
+            justifyContent: "center",
+            width: "100%",
+          }}
         >
-          <Icon className="h-4 w-4" />
+          <Icon size={16} strokeWidth={2} />
         </div>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">{title}</p>
-          <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
-        </div>
-      </div>
+      </foreignObject>
+
+      <text
+        x={node.x + 48}
+        y={node.y + 30}
+        fill={textColor}
+        fontFamily="Inter, -apple-system, BlinkMacSystemFont, sans-serif"
+        fontSize="14"
+        fontWeight="650"
+      >
+        {title || node.fallbackTitle}
+      </text>
+      <text
+        x={node.x + 48}
+        y={node.y + 49}
+        fill={DESIGN_TOKENS.colors.textSecondary}
+        fontFamily="Inter, -apple-system, BlinkMacSystemFont, sans-serif"
+        fontSize="12"
+        fontWeight="400"
+      >
+        {subtitle}
+      </text>
+    </g>
+  );
+}
+
+function LegendItem({ color, label }: { color: string; label: string }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ backgroundColor: color }} />
+      <span className="truncate" style={{ color: DESIGN_TOKENS.colors.textSecondary }}>
+        {label}
+      </span>
     </div>
   );
+}
+
+function calculateBezierPath(
+  fromNode: NodeCoord,
+  toNode: NodeCoord,
+  type: "vertical" | "horizontal" | "diagonal"
+): string {
+  const { width, height } = DESIGN_TOKENS.node;
+  let x1: number;
+  let y1: number;
+  let x2: number;
+  let y2: number;
+
+  if (type === "horizontal") {
+    x1 = fromNode.x + width;
+    y1 = fromNode.y + height / 2;
+    x2 = toNode.x;
+    y2 = toNode.y + height / 2;
+  } else {
+    x1 = fromNode.x + width / 2;
+    y1 = fromNode.y + height;
+    x2 = toNode.x + width / 2;
+    y2 = toNode.y;
+  }
+
+  if (type === "horizontal") {
+    const dx = x2 - x1;
+    return `M ${x1} ${y1} C ${x1 + dx * 0.4} ${y1} ${x2 - dx * 0.4} ${y2} ${x2} ${y2}`;
+  }
+
+  const dy = y2 - y1;
+  return `M ${x1} ${y1} C ${x1} ${y1 + dy * 0.4} ${x2} ${y2 - dy * 0.4} ${x2} ${y2}`;
 }
 
 function getNodeStates(workbench?: { status: string; plan: unknown[]; toolLogs: unknown[] }) {
@@ -351,7 +670,6 @@ function getNodeStates(workbench?: { status: string; plan: unknown[]; toolLogs: 
     if (workbench.toolLogs.length > 0) {
       states.executor = "active";
       states.observation = "active";
-      states.energy = "idle";
     }
     return states;
   }
