@@ -311,14 +311,15 @@ export default function AgentFlowPanel({ isOpen, onClose }: AgentFlowPanelProps)
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto p-6">
+          <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
             <svg
               width="100%"
-              height="1040"
-              viewBox="0 0 1000 1040"
-              preserveAspectRatio="xMidYMin meet"
+              height="100%"
+              viewBox="205 55 670 900"
+              preserveAspectRatio="xMidYMid meet"
               style={{
-                minWidth: "880px",
+                display: "block",
+                maxHeight: "100%",
                 backgroundColor: DESIGN_TOKENS.colors.canvasBg,
                 borderRadius: "8px",
               }}
