@@ -106,9 +106,11 @@ class ExplainWorker:
 
     def explain_architecture(self) -> str:
         return (
-            "簡單版架構：\n"
-            "- Agent Loop：負責接收任務、呼叫 Manager、執行工具、交給 Worker 回覆。\n"
-            "- Manager Model：負責判斷任務類型、選 worker、選工具。\n"
-            "- Worker Models：負責把工具結果整理成可理解、可行動的答案。\n"
-            "- Tools：負責真正讀檔、搜尋、跑命令。"
+            "Hermes Bounded Closed Loop：\n"
+            "- Loop Controller：負責步數、重試、停止原因、trace 與 hard limits。\n"
+            "- Planner Agent：由 Manager Model 擔任，負責拆任務、選工具與提出計畫。\n"
+            "- Processor Agent：由 Worker Model 擔任，負責整理 observation 與輸出可讀回覆。\n"
+            "- Policy Gate：負責 allow / deny / approval_required，不可被模型覆蓋。\n"
+            "- Executor：只執行註冊工具，不做任務推理。\n"
+            "- Energy Monitor：提供 continue / replan / stop / ask_user 的啟發式風險訊號。"
         )

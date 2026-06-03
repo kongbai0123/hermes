@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 
 from .config import load_config
+from .bounded_loop import LoopLimits
 from .llm import OllamaClient
 from .loop import AgentLoop
 from .roles import ManagerModel, WorkerModel
@@ -13,7 +14,14 @@ def build_agent(model_override: str | None = None) -> AgentLoop:
     config = load_config()
     llm = OllamaClient(model_override or config["model"], config["ollama_url"])
     tools = ToolBox(config["workspace_path"], config["allowed_commands"])
-    return AgentLoop(ManagerModel(llm), WorkerModel(llm), tools)
+    limits = LoopLimits(
+        max_steps=int(config.get("max_steps", 6)),
+        max_replans=int(config.get("max_replans", 2)),
+        max_tool_failures=int(config.get("max_tool_failures", 2)),
+        max_same_action_repeat=int(config.get("max_same_action_repeat", 1)),
+        default_capability=str(config.get("default_capability", "read_only")),
+    )
+    return AgentLoop(ManagerModel(llm), WorkerModel(llm), tools, limits)
 
 
 def main() -> None:

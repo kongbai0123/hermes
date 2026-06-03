@@ -81,12 +81,22 @@ def run_task(prompt: str, model_override: str | None = None) -> dict:
     captured_stdout = io.StringIO()
     with contextlib.redirect_stdout(captured_stdout):
         result = agent.run_once_structured(prompt)
+    stop_reason = str(result.get("stop_reason", "DONE"))
+    status = "done" if stop_reason == "DONE" else "blocked" if stop_reason in {
+        "NEEDS_USER_APPROVAL",
+        "NEEDS_USER_INPUT",
+        "POLICY_REJECTED",
+        "NO_PROGRESS_DETECTED",
+    } else "error"
 
     return {
         "ok": True,
         "prompt": prompt,
         "answer": result["answer"],
-        "status": "done" if result["observation"]["ok"] else "error",
+        "status": status,
+        "stopReason": stop_reason,
+        "trace": result.get("trace", []),
+        "loop": result.get("loop", {}),
         "plan": [
             {
                 "id": "understand",
@@ -103,8 +113,8 @@ def run_task(prompt: str, model_override: str | None = None) -> dict:
             {
                 "id": "summarize",
                 "title": "Summarize findings",
-                "detail": "Return a concise explanation and next step.",
-                "status": "done",
+                "detail": f"Return a concise explanation and next step. Stop reason: {stop_reason}",
+                "status": "done" if status == "done" else "error",
             },
         ],
         "toolLogs": [

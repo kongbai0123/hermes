@@ -9,7 +9,11 @@ DEFAULT_CONFIG = {
     "model": "gemma4:latest",
     "ollama_url": "http://localhost:11434/api/chat",
     "workspace": "workspace",
-    "max_steps": 4,
+    "max_steps": 6,
+    "max_replans": 2,
+    "max_tool_failures": 2,
+    "max_same_action_repeat": 1,
+    "default_capability": "read_only",
     "allowed_commands": [
         "python --version",
         "python -m pytest",
