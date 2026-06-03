@@ -117,21 +117,28 @@ type TranslationKey =
   | "flow.title"
   | "flow.show"
   | "flow.hide"
+  | "flow.resize"
   | "flow.user.title"
   | "flow.user.subtitle"
-  | "flow.manager.title"
-  | "flow.manager.subtitle"
-  | "flow.workerA.title"
-  | "flow.workerA.subtitle"
-  | "flow.workerB.title"
-  | "flow.workerB.subtitle"
-  | "flow.integration.title"
-  | "flow.integration.subtitle"
+  | "flow.controller.title"
+  | "flow.controller.subtitle"
+  | "flow.planner.title"
+  | "flow.planner.subtitle"
+  | "flow.processor.title"
+  | "flow.processor.subtitle"
+  | "flow.policy.title"
+  | "flow.policy.subtitle"
+  | "flow.executor.title"
+  | "flow.executor.subtitle"
+  | "flow.observation.title"
+  | "flow.observation.subtitle"
+  | "flow.energy.title"
+  | "flow.energy.subtitle"
   | "flow.final.title"
   | "flow.final.subtitle"
   | "flow.stage.waiting"
-  | "flow.stage.manager"
-  | "flow.stage.workers"
+  | "flow.stage.planner"
+  | "flow.stage.executor"
   | "flow.stage.final"
   | "flow.stage.error"
   | "flow.legend.title"
@@ -252,26 +259,33 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "notFound.title": "找不到頁面",
     "notFound.body": "你要找的頁面不存在，可能已移動或刪除。",
     "notFound.home": "回首頁",
-    "flow.title": "Agent 分工流程",
-    "flow.show": "展開 Agent 分工流程",
-    "flow.hide": "隱藏 Agent 分工流程",
+    "flow.title": "Hermes 閉回路",
+    "flow.show": "展開 Hermes 閉回路",
+    "flow.hide": "隱藏 Hermes 閉回路",
+    "flow.resize": "拖曳調整閉回路面板寬度",
     "flow.user.title": "User",
     "flow.user.subtitle": "提交任務",
-    "flow.manager.title": "Manager Model",
-    "flow.manager.subtitle": "管理者 / 決策角色",
-    "flow.workerA.title": "Worker A",
-    "flow.workerA.subtitle": "程式專家",
-    "flow.workerB.title": "Worker B",
-    "flow.workerB.subtitle": "整理 / 文案專家",
-    "flow.integration.title": "Integration",
-    "flow.integration.subtitle": "檢視與整合",
+    "flow.controller.title": "Loop Controller",
+    "flow.controller.subtitle": "硬限制 / 斷點",
+    "flow.planner.title": "Planner",
+    "flow.planner.subtitle": "規劃與成功條件",
+    "flow.processor.title": "Processor",
+    "flow.processor.subtitle": "檢查與整理",
+    "flow.policy.title": "Policy Gate",
+    "flow.policy.subtitle": "治理與授權",
+    "flow.executor.title": "Executor",
+    "flow.executor.subtitle": "註冊工具執行",
+    "flow.observation.title": "Observation",
+    "flow.observation.subtitle": "工具回傳",
+    "flow.energy.title": "Energy Monitor",
+    "flow.energy.subtitle": "進展 / 風險",
     "flow.final.title": "Final Output",
     "flow.final.subtitle": "輸出結果",
     "flow.stage.waiting": "目前：等待使用者提交任務",
-    "flow.stage.manager": "目前：Manager 正在拆解任務與規劃",
-    "flow.stage.workers": "目前：Worker Models 正在執行子任務",
-    "flow.stage.final": "目前：整合完成，準備輸出最終結果",
-    "flow.stage.error": "目前：流程遇到錯誤，需要檢查工具觀察",
+    "flow.stage.planner": "目前：閉回路正在規劃、檢查或等待工具",
+    "flow.stage.executor": "目前：Executor 正在執行工具並產生 Observation",
+    "flow.stage.final": "目前：閉回路已到達 Final / Stop",
+    "flow.stage.error": "目前：閉回路遇到錯誤或 policy stop",
     "flow.legend.title": "狀態說明",
     "flow.legend.dim": "未到此階段",
     "flow.legend.active": "目前階段",
@@ -389,26 +403,33 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "notFound.title": "Page Not Found",
     "notFound.body": "Sorry, the page you are looking for does not exist. It may have been moved or deleted.",
     "notFound.home": "Go Home",
-    "flow.title": "Agent Work Split",
-    "flow.show": "Show agent work split",
-    "flow.hide": "Hide agent work split",
+    "flow.title": "Hermes Closed Loop",
+    "flow.show": "Show Hermes closed loop",
+    "flow.hide": "Hide Hermes closed loop",
+    "flow.resize": "Drag to resize the closed-loop panel",
     "flow.user.title": "User",
     "flow.user.subtitle": "Submit task",
-    "flow.manager.title": "Manager Model",
-    "flow.manager.subtitle": "Coordinator / decision role",
-    "flow.workerA.title": "Worker A",
-    "flow.workerA.subtitle": "Code specialist",
-    "flow.workerB.title": "Worker B",
-    "flow.workerB.subtitle": "Writing / synthesis specialist",
-    "flow.integration.title": "Integration",
-    "flow.integration.subtitle": "Review and merge",
+    "flow.controller.title": "Loop Controller",
+    "flow.controller.subtitle": "Limits / stop points",
+    "flow.planner.title": "Planner",
+    "flow.planner.subtitle": "Plan and criteria",
+    "flow.processor.title": "Processor",
+    "flow.processor.subtitle": "Review and compact",
+    "flow.policy.title": "Policy Gate",
+    "flow.policy.subtitle": "Governance / approval",
+    "flow.executor.title": "Executor",
+    "flow.executor.subtitle": "Registered tools",
+    "flow.observation.title": "Observation",
+    "flow.observation.subtitle": "Tool result",
+    "flow.energy.title": "Energy Monitor",
+    "flow.energy.subtitle": "Progress / risk",
     "flow.final.title": "Final Output",
     "flow.final.subtitle": "Deliver result",
     "flow.stage.waiting": "Current: waiting for the user to submit a task",
-    "flow.stage.manager": "Current: Manager is decomposing and planning",
-    "flow.stage.workers": "Current: Worker Models are executing subtasks",
-    "flow.stage.final": "Current: integration complete, final output ready",
-    "flow.stage.error": "Current: the flow hit an error; inspect tool observations",
+    "flow.stage.planner": "Current: closed loop is planning, reviewing, or waiting for tools",
+    "flow.stage.executor": "Current: Executor is running tools and producing observations",
+    "flow.stage.final": "Current: closed loop reached final / stop",
+    "flow.stage.error": "Current: closed loop hit an error or policy stop",
     "flow.legend.title": "State Legend",
     "flow.legend.dim": "Not reached",
     "flow.legend.active": "Current stage",
