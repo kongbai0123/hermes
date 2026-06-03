@@ -25,12 +25,13 @@ class ManagerModel:
             "你是 Manager Model。請把使用者任務轉成簡單決策。\n"
             "只能輸出 JSON，不要 markdown。\n"
             "JSON 格式：{\"plan\":\"...\",\"worker\":\"file|search|test|explain\","
-            "\"tool\":\"list_files|read_file|search_text|run_command|none\","
-            "\"args\":{\"path\":\"...\",\"keyword\":\"...\",\"command\":\"...\"}}\n"
+            "\"tool\":\"list_files|read_file|search_text|run_command|proxy_fetch|none\","
+            "\"args\":{\"path\":\"...\",\"keyword\":\"...\",\"command\":\"...\",\"url\":\"...\"}}\n"
             "若使用者要看結構，用 list_files。若要讀檔，用 read_file。"
             "若要找關鍵字，用 search_text。若要跑測試或版本，用 run_command。"
-            "目前沒有 Browser、API、Proxy 或即時網路代理工具；若任務需要這些能力，"
-            "tool 請選 none，plan 請明確說明目前版本尚未接上該工具。"
+            "若使用者明確要求網路 proxy 或抓取外部 URL，用 proxy_fetch，args 必須包含 url。"
+            "proxy_fetch 仍會經過 Policy Gate 與 allowlist，不可承諾一定能執行。"
+            "目前沒有 Browser 操作工具；若任務需要瀏覽器點擊，tool 請選 none。"
         )
         try:
             raw = self.llm.chat(
@@ -63,13 +64,17 @@ class ManagerModel:
         if any(word in text for word in ["測試", "pytest", "執行", "version"]):
             command = "python --version" if "version" in text else "pytest"
             return ManagerDecision("執行白名單命令。", "test", "run_command", {"command": command})
-        if any(word in text for word in ["代理", "proxy", "browser", "瀏覽器", "api", "網路請求", "爬取"]):
+        if any(word in text for word in ["代理", "proxy", "api", "網路請求", "爬取", "抓取"]):
+            url_match = re.search(r"https?://\S+", user_text)
+            url = url_match.group(0).rstrip("。.,，") if url_match else ""
             return ManagerDecision(
-                "目前版本尚未接上 Browser、API、Proxy 或即時網路代理工具。",
-                "explain",
-                "none",
-                {},
+                "使用 proxy_fetch 嘗試抓取外部 URL，但必須先通過 Policy Gate、approval 與 domain allowlist。",
+                "network",
+                "proxy_fetch",
+                {"url": url},
             )
+        if any(word in text for word in ["browser", "瀏覽器"]):
+            return ManagerDecision("目前版本尚未接上 Browser 操作工具。", "explain", "none", {})
         return ManagerDecision("列出 workspace 結構後整理說明。", "file", "list_files", {"path": "."})
 
 

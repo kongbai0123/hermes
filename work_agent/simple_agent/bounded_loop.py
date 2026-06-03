@@ -54,6 +54,7 @@ class EnergyResult:
 class PolicyGate:
     READ_ONLY_TOOLS = {"list_files", "read_file", "search_text", "none"}
     WRITE_TOOLS = {"write_file", "apply_patch", "generate_patch"}
+    NETWORK_TOOLS = {"proxy_fetch"}
 
     def evaluate(self, decision: ManagerDecision, capability: str) -> PolicyResult:
         tool = decision.tool
@@ -69,6 +70,8 @@ class PolicyGate:
             if capability in {"approved_write", "full_dev"}:
                 return PolicyResult("medium", "approval_required", "Shell commands require approval.")
             return PolicyResult("medium", "approval_required", "Default read-only capability cannot run shell commands.")
+        if tool in self.NETWORK_TOOLS:
+            return PolicyResult("network", "approval_required", "Network or proxy tools require explicit approval.")
         if tool in self.WRITE_TOOLS:
             return PolicyResult("medium", "approval_required", "Write or patch actions require approval.")
         return PolicyResult("high", "deny", f"Unknown or unsupported tool: {tool}")

@@ -12,5 +12,6 @@
     "python -m pytest",
     "pytest",
     "rg"
-  ]
+  ],
+  "allowed_proxy_domains": []
 }

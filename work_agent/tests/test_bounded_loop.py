@@ -63,6 +63,28 @@ def test_bounded_loop_requires_approval_for_shell_by_default(tmp_path: Path) -> 
     assert result["trace"][0]["policy"]["decision"] == "approval_required"
 
 
+def test_bounded_loop_requires_approval_for_proxy_fetch(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    controller = make_controller(
+        workspace,
+        [
+            ManagerDecision(
+                "Fetch external data through the proxy tool.",
+                "network",
+                "proxy_fetch",
+                {"url": "https://example.com/status"},
+            )
+        ],
+    )
+
+    result = controller.run("use proxy to fetch example.com")
+
+    assert result["stop_reason"] == "NEEDS_USER_APPROVAL"
+    assert result["trace"][0]["policy"]["risk"] == "network"
+    assert result["trace"][0]["policy"]["decision"] == "approval_required"
+
+
 def test_bounded_loop_rejects_destructive_request(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()

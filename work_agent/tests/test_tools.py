@@ -24,3 +24,54 @@ def test_list_files_inside_workspace(tmp_path: Path) -> None:
     assert result.ok is True
     assert "hello.txt" in result.content
 
+
+def test_proxy_fetch_requires_allowed_domain(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    tools = ToolBox(str(workspace), ["python --version"])
+
+    result = tools.proxy_fetch("https://example.com")
+
+    assert result.ok is False
+    assert "allowlist" in result.content
+
+
+def test_proxy_fetch_rejects_localhost_even_when_allowlisted(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    tools = ToolBox(str(workspace), ["python --version"], allowed_proxy_domains=["localhost"])
+
+    result = tools.proxy_fetch("http://localhost:11434/api/tags")
+
+    assert result.ok is False
+    assert "內網" in result.content
+
+
+def test_proxy_fetch_uses_registered_fetcher_for_allowlisted_domain(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+
+    def fake_fetcher(url: str, timeout: int, max_bytes: int) -> str:
+        assert url == "https://example.com/status"
+        assert timeout == 10
+        assert max_bytes == 4096
+        return "proxy ok"
+
+    tools = ToolBox(
+        str(workspace),
+        ["python --version"],
+        allowed_proxy_domains=["example.com"],
+        proxy_fetcher=fake_fetcher,
+    )
+
+    result = tools.proxy_fetch("https://example.com/status", timeout=10, max_bytes=4096)
+
+    assert result.ok is True
+    assert result.content == "proxy ok"
+
+
+def test_proxy_fetch_execute_reports_invalid_numeric_args(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    tools = ToolBox(str(workspace), ["python --version"], allowed_proxy_domains=["example.com"])
+
+    result = tools.execute("proxy_fetch", url="https://example.com", timeout="slow")
+
+    assert result.ok is False
+    assert "timeout" in result.content

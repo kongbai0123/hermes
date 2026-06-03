@@ -36,7 +36,11 @@ def strip_code_fences(text: str) -> str:
 
 def generate_patch(prompt: str, path: str, model_override: str | None = None) -> dict:
     config = load_config()
-    tools = ToolBox(config["workspace_path"], config["allowed_commands"])
+    tools = ToolBox(
+        config["workspace_path"],
+        config["allowed_commands"],
+        allowed_proxy_domains=list(config.get("allowed_proxy_domains", [])),
+    )
     observation = tools.read_file(path)
     if not observation.ok:
         return {"ok": False, "error": observation.content}

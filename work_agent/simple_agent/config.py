@@ -20,6 +20,7 @@ DEFAULT_CONFIG = {
         "pytest",
         "rg",
     ],
+    "allowed_proxy_domains": [],
 }
 
 

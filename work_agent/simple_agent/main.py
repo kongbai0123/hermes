@@ -13,7 +13,11 @@ from .tools import ToolBox
 def build_agent(model_override: str | None = None) -> AgentLoop:
     config = load_config()
     llm = OllamaClient(model_override or config["model"], config["ollama_url"])
-    tools = ToolBox(config["workspace_path"], config["allowed_commands"])
+    tools = ToolBox(
+        config["workspace_path"],
+        config["allowed_commands"],
+        allowed_proxy_domains=list(config.get("allowed_proxy_domains", [])),
+    )
     limits = LoopLimits(
         max_steps=int(config.get("max_steps", 6)),
         max_replans=int(config.get("max_replans", 2)),
