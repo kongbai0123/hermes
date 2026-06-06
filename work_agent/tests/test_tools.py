@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from simple_agent.external_chat import FakeExternalChatBridge
 from simple_agent.tools import ToolBox
 
 
@@ -106,3 +107,52 @@ def test_open_browser_rejects_localhost_even_when_allowlisted(tmp_path: Path) ->
 
     assert result.ok is False
     assert "內網" in result.content
+
+
+def test_external_chat_sends_message_and_receives_reply(tmp_path: Path) -> None:
+    bridge = FakeExternalChatBridge({"HI": "HI，很高興為你服務"})
+    tools = ToolBox(str(tmp_path), ["python --version"], external_chat_bridge=bridge)
+
+    result = tools.external_chat("HI", target="chatgpt_web")
+
+    assert result.ok is True
+    assert result.tool == "external_chat"
+    assert "HI，很高興為你服務" in result.content
+    assert bridge.sent_messages == [("chatgpt_web", "HI")]
+
+
+def test_external_chat_execute_uses_default_target(tmp_path: Path) -> None:
+    bridge = FakeExternalChatBridge({"HI": "HI，很高興為你服務"})
+    tools = ToolBox(str(tmp_path), ["python --version"], external_chat_bridge=bridge)
+
+    result = tools.execute("external_chat", message="HI")
+
+    assert result.ok is True
+    assert bridge.sent_messages == [("chatgpt_web", "HI")]
+
+
+def test_external_chat_loop_runs_multiple_turns(tmp_path: Path) -> None:
+    bridge = FakeExternalChatBridge(
+        {"HI": "第一輪回覆"},
+        default_reply="第二輪回覆",
+    )
+    tools = ToolBox(str(tmp_path), ["python --version"], external_chat_bridge=bridge)
+
+    result = tools.external_chat_loop("HI", target="chatgpt_web", max_turns="2")
+
+    assert result.ok is True
+    assert result.tool == "external_chat_loop"
+    assert '"turn_count": 2' in result.content
+    assert "第一輪回覆" in result.content
+    assert "第二輪回覆" in result.content
+    assert len(bridge.sent_messages) == 2
+
+
+def test_external_chat_loop_execute_uses_default_target(tmp_path: Path) -> None:
+    bridge = FakeExternalChatBridge({"HI": "收到"})
+    tools = ToolBox(str(tmp_path), ["python --version"], external_chat_bridge=bridge)
+
+    result = tools.execute("external_chat_loop", message="HI", max_turns="1")
+
+    assert result.ok is True
+    assert bridge.sent_messages == [("chatgpt_web", "HI")]

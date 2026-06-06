@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 from .config import load_config
-from .main import build_agent
+from .main import build_agent, build_external_chat_bridge
 from .tools import ToolBox
 
 
@@ -41,6 +41,7 @@ def generate_patch(prompt: str, path: str, model_override: str | None = None) ->
         config["allowed_commands"],
         allowed_proxy_domains=list(config.get("allowed_proxy_domains", [])),
         allowed_browser_domains=list(config.get("allowed_browser_domains", [])),
+        external_chat_bridge=build_external_chat_bridge(config),
     )
     observation = tools.read_file(path)
     if not observation.ok:
@@ -94,13 +95,18 @@ def run_task(prompt: str, model_override: str | None = None) -> dict:
         "NO_PROGRESS_DETECTED",
     } else "error"
 
+    trace = result.get("trace", [])
+    latest_trace = trace[-1] if trace else {}
+    routing = latest_trace.get("routing", {})
+    policy = latest_trace.get("policy", {})
+
     return {
         "ok": True,
         "prompt": prompt,
         "answer": result["answer"],
         "status": status,
         "stopReason": stop_reason,
-        "trace": result.get("trace", []),
+        "trace": trace,
         "loop": result.get("loop", {}),
         "plan": [
             {
@@ -127,9 +133,19 @@ def run_task(prompt: str, model_override: str | None = None) -> dict:
                 "id": "primary-observation",
                 "tool": result["observation"]["tool"],
                 "ok": result["observation"]["ok"],
-                "summary": result["decision"]["plan"],
+                "summary": (
+                    f'{routing.get("execution_mode", "PLAN_ONLY")} / '
+                    f'{policy.get("decision", "unknown")} - {result["decision"]["plan"]}'
+                ),
                 "content": result["observation"]["content"],
-                "args": result["decision"]["args"],
+                "args": {
+                    **result["decision"]["args"],
+                    "execution_mode": str(routing.get("execution_mode", "")),
+                    "executor": str(routing.get("executor", "")),
+                    "template_id": str(routing.get("template_id", "")),
+                    "risk": str(policy.get("risk", "")),
+                    "requires_approval": str(policy.get("requires_approval", "")),
+                },
             }
         ],
         "safetyRules": [

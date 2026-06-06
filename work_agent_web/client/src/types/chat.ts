@@ -16,6 +16,7 @@ export interface Attachment {
   name: string;
   size: number;
   type?: string;
+  dataUrl?: string;
 }
 
 export interface WorkbenchPlanStep {
@@ -46,6 +47,13 @@ export interface WorkspaceEntry {
   kind: "file" | "dir";
   summary: string;
   children?: WorkspaceEntry[];
+}
+
+export interface ProjectBucket {
+  id: string;
+  title: string;
+  chatIds: string[];
+  isExpanded: boolean;
 }
 
 export interface WorkspaceFilePreview {
@@ -109,6 +117,7 @@ export interface Chat {
 export interface AppState {
   currentChatId: string | null;
   chats: Chat[];
+  projects: ProjectBucket[];
   models: Model[];
   isLoading: boolean;
   theme: "light" | "dark";
@@ -117,11 +126,15 @@ export interface AppState {
 }
 
 export type ChatAction =
+  | { type: "HYDRATE_STATE"; payload: AppState }
   | { type: "CREATE_CHAT"; payload: Chat }
   | { type: "SELECT_CHAT"; payload: string }
   | { type: "DELETE_CHAT"; payload: string }
   | { type: "RENAME_CHAT"; payload: { id: string; title: string } }
   | { type: "PIN_CHAT"; payload: string }
+  | { type: "CREATE_PROJECT"; payload: ProjectBucket }
+  | { type: "TOGGLE_PROJECT"; payload: string }
+  | { type: "ASSIGN_CHAT_TO_PROJECT"; payload: { projectId: string; chatId: string } }
   | { type: "ADD_MESSAGE"; payload: Message }
   | { type: "UPDATE_MESSAGE"; payload: Message }
   | { type: "DELETE_MESSAGE"; payload: { chatId: string; messageId: string } }

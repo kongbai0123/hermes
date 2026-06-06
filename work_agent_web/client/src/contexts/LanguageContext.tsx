@@ -20,7 +20,14 @@ type TranslationKey =
   | "sidebar.noChats"
   | "sidebar.noChatsYet"
   | "sidebar.workspace"
+  | "sidebar.workTasks"
+  | "sidebar.files"
   | "sidebar.refreshWorkspace"
+  | "sidebar.projects"
+  | "sidebar.addProject"
+  | "sidebar.newProject"
+  | "sidebar.dropChat"
+  | "sidebar.emptyProject"
   | "sidebar.rename"
   | "sidebar.pin"
   | "sidebar.unpin"
@@ -39,6 +46,8 @@ type TranslationKey =
   | "empty.start.desc"
   | "toast.createdTask"
   | "toast.messageCopied"
+  | "toast.messageDeleted"
+  | "toast.chatFiled"
   | "toast.placeholderNoted"
   | "toast.requestStopped"
   | "toast.attachmentDisabled"
@@ -64,6 +73,7 @@ type TranslationKey =
   | "bubble.regenerate"
   | "bubble.good"
   | "bubble.bad"
+  | "bubble.delete"
   | "bubble.regenerateLabel"
   | "bubble.positiveLabel"
   | "bubble.negativeLabel"
@@ -165,7 +175,14 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "sidebar.noChats": "找不到對話",
     "sidebar.noChatsYet": "尚無對話，先建立一個工作。",
     "sidebar.workspace": "工作區",
+    "sidebar.workTasks": "工作區",
+    "sidebar.files": "檔案區",
     "sidebar.refreshWorkspace": "重新整理工作區",
+    "sidebar.projects": "專案區",
+    "sidebar.addProject": "新增專案",
+    "sidebar.newProject": "新專案",
+    "sidebar.dropChat": "拖曳左側項目到此專案",
+    "sidebar.emptyProject": "將左側項目拖曳到這裡",
     "sidebar.rename": "重新命名",
     "sidebar.pin": "釘選",
     "sidebar.unpin": "取消釘選",
@@ -184,6 +201,8 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "empty.start.desc": "開啟安全工作階段並送出第一個請求",
     "toast.createdTask": "已建立任務：{title}",
     "toast.messageCopied": "已複製訊息。",
+    "toast.messageDeleted": "已刪除訊息。",
+    "toast.chatFiled": "已移動到專案區。",
     "toast.placeholderNoted": "{label} 已記錄在目前 Work Agent 工作階段。",
     "toast.requestStopped": "已停止 Work Agent 請求。",
     "toast.attachmentDisabled": "尚未啟用檔案附件。目前 Work Agent 流程專注於文字任務、工作區工具與觀察結果。",
@@ -209,6 +228,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "bubble.regenerate": "重新產生",
     "bubble.good": "回覆良好",
     "bubble.bad": "回覆不佳",
+    "bubble.delete": "刪除訊息",
     "bubble.regenerateLabel": "重新產生",
     "bubble.positiveLabel": "正向回饋",
     "bubble.negativeLabel": "負向回饋",
@@ -309,7 +329,14 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "sidebar.noChats": "No chats found",
     "sidebar.noChatsYet": "No chats yet. Start a new one!",
     "sidebar.workspace": "Workspace",
+    "sidebar.workTasks": "Workspace",
+    "sidebar.files": "Files",
     "sidebar.refreshWorkspace": "Refresh workspace",
+    "sidebar.projects": "Projects",
+    "sidebar.addProject": "Add project",
+    "sidebar.newProject": "New Project",
+    "sidebar.dropChat": "Drop a sidebar item into this project",
+    "sidebar.emptyProject": "Drop sidebar items here",
     "sidebar.rename": "Rename",
     "sidebar.pin": "Pin",
     "sidebar.unpin": "Unpin",
@@ -328,6 +355,8 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "empty.start.desc": "Open a safe work session and send your first request",
     "toast.createdTask": "Created task: {title}",
     "toast.messageCopied": "Message copied.",
+    "toast.messageDeleted": "Message deleted.",
+    "toast.chatFiled": "Moved to project.",
     "toast.placeholderNoted": "{label} is noted for the current Work Agent session.",
     "toast.requestStopped": "Work Agent request stopped.",
     "toast.attachmentDisabled": "File attachment is not enabled yet. Current Work Agent flow focuses on text tasks, workspace tools, and observations.",
@@ -353,6 +382,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "bubble.regenerate": "Regenerate",
     "bubble.good": "Good response",
     "bubble.bad": "Bad response",
+    "bubble.delete": "Delete message",
     "bubble.regenerateLabel": "Regenerate",
     "bubble.positiveLabel": "Positive feedback",
     "bubble.negativeLabel": "Negative feedback",

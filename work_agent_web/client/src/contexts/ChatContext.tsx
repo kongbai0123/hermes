@@ -1,6 +1,12 @@
-import { createContext, useContext, useReducer, ReactNode } from "react";
+import { createContext, useContext, useEffect, useReducer, useRef, ReactNode } from "react";
 import { AppState, ChatAction, Chat } from "@/types/chat";
 import { WORK_AGENT_MODELS } from "@/lib/workAgent";
+import {
+  fetchServerChatState,
+  persistServerChatState,
+  readLocalChatState,
+  writeLocalChatState,
+} from "@/lib/chatStateStorage";
 
 /**
  * Chat Context: Global state management for LLM chat application
@@ -9,14 +15,56 @@ import { WORK_AGENT_MODELS } from "@/lib/workAgent";
 const initialState: AppState = {
   currentChatId: null,
   chats: [],
+  projects: [
+    {
+      id: "general-project",
+      title: "一般專案",
+      chatIds: [],
+      isExpanded: true,
+    },
+  ],
   models: WORK_AGENT_MODELS,
   isLoading: false,
   theme: "light",
   rightPanelOpen: false,
 };
 
-function chatReducer(state: AppState, action: ChatAction): AppState {
+function reviveDate(value: unknown): Date {
+  if (value instanceof Date) return value;
+  const date = new Date(String(value || Date.now()));
+  return Number.isNaN(date.getTime()) ? new Date() : date;
+}
+
+export function restoreChatState(serialized: string | null): AppState {
+  if (!serialized) return initialState;
+
+  try {
+    const parsed = JSON.parse(serialized) as Partial<AppState>;
+    return {
+      ...initialState,
+      ...parsed,
+      models: WORK_AGENT_MODELS,
+      chats: (parsed.chats || []).map((chat) => ({
+        ...chat,
+        createdAt: reviveDate(chat.createdAt),
+        updatedAt: reviveDate(chat.updatedAt),
+        messages: (chat.messages || []).map((message) => ({
+          ...message,
+          createdAt: reviveDate(message.createdAt),
+        })),
+      })) as Chat[],
+      projects: parsed.projects?.length ? parsed.projects : initialState.projects,
+    };
+  } catch {
+    return initialState;
+  }
+}
+
+export function chatReducer(state: AppState, action: ChatAction): AppState {
   switch (action.type) {
+    case "HYDRATE_STATE":
+      return action.payload;
+
     case 'CREATE_CHAT': {
       const newChats = [action.payload, ...state.chats];
       return {
@@ -39,6 +87,10 @@ function chatReducer(state: AppState, action: ChatAction): AppState {
       return {
         ...state,
         chats: newChats,
+        projects: state.projects.map((project) => ({
+          ...project,
+          chatIds: project.chatIds.filter((chatId) => chatId !== action.payload),
+        })),
         currentChatId: newCurrentId,
       };
     }
@@ -58,6 +110,45 @@ function chatReducer(state: AppState, action: ChatAction): AppState {
         chats: state.chats.map((chat) =>
           chat.id === action.payload ? { ...chat, isPinned: !chat.isPinned } : chat
         ),
+      };
+    }
+
+    case "CREATE_PROJECT": {
+      return {
+        ...state,
+        projects: [action.payload, ...state.projects],
+      };
+    }
+
+    case "TOGGLE_PROJECT": {
+      return {
+        ...state,
+        projects: state.projects.map((project) =>
+          project.id === action.payload
+            ? { ...project, isExpanded: !project.isExpanded }
+            : project
+        ),
+      };
+    }
+
+    case "ASSIGN_CHAT_TO_PROJECT": {
+      return {
+        ...state,
+        projects: state.projects.map((project) => {
+          const chatIds = project.chatIds.filter(
+            (chatId) => chatId !== action.payload.chatId
+          );
+
+          if (project.id !== action.payload.projectId) {
+            return { ...project, chatIds };
+          }
+
+          return {
+            ...project,
+            isExpanded: true,
+            chatIds: [action.payload.chatId, ...chatIds],
+          };
+        }),
       };
     }
 
@@ -177,7 +268,36 @@ interface ChatContextType {
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(chatReducer, initialState);
+  const hasLoadedServerState = useRef(false);
+  const [state, dispatch] = useReducer(
+    chatReducer,
+    initialState,
+    () => restoreChatState(readLocalChatState())
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchServerChatState()
+      .then((serialized) => {
+        if (cancelled || !serialized) return;
+        dispatch({ type: "HYDRATE_STATE", payload: restoreChatState(serialized) });
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        hasLoadedServerState.current = true;
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    writeLocalChatState(state);
+    if (!hasLoadedServerState.current) return;
+    persistServerChatState(state).catch(() => undefined);
+  }, [state]);
 
   const currentChat = state.currentChatId
     ? state.chats.find((chat) => chat.id === state.currentChatId) || null

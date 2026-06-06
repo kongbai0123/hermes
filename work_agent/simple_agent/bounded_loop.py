@@ -6,6 +6,13 @@ from typing import Literal
 
 from .roles import ManagerDecision, ManagerModel, WorkerModel
 from .tools import Observation, ToolBox
+from .work_execution import (
+    CommandTemplateRegistry,
+    ExecutionMode,
+    PolicyDecision as WorkPolicyDecision,
+    WorkIntent,
+    WorkSkillRouter,
+)
 
 
 StopReason = Literal[
@@ -38,6 +45,11 @@ class PolicyResult:
     risk: str
     decision: PolicyDecision
     reason: str
+    execution_mode: str = "PLAN_ONLY"
+    executor: str = "none"
+    template_id: str | None = None
+    capability: str = "L0_PLAN_ONLY"
+    requires_approval: bool = False
 
 
 @dataclass
@@ -56,8 +68,70 @@ class PolicyGate:
     WRITE_TOOLS = {"write_file", "apply_patch", "generate_patch"}
     NETWORK_TOOLS = {"proxy_fetch"}
     BROWSER_TOOLS = {"open_browser"}
+    EXTERNAL_AGENT_TOOLS = {"external_codex", "external_chat", "external_chat_loop"}
 
     def evaluate(self, decision: ManagerDecision, capability: str) -> PolicyResult:
+        intent = self._intent_from_decision(decision, capability)
+        route = WorkSkillRouter(CommandTemplateRegistry.default()).route(intent)
+        if route.policy_decision == WorkPolicyDecision.DENY:
+            return PolicyResult(
+                route.risk,
+                "deny",
+                route.reason,
+                route.execution_mode.value,
+                route.executor,
+                route.template_id,
+                route.capability.value,
+                route.requires_approval,
+            )
+        if route.policy_decision == WorkPolicyDecision.APPROVAL_REQUIRED:
+            return PolicyResult(
+                route.risk,
+                "approval_required",
+                route.reason,
+                route.execution_mode.value,
+                route.executor,
+                route.template_id,
+                route.capability.value,
+                route.requires_approval,
+            )
+        if (
+            route.capability.value == "L2_LOCAL_VERIFY"
+            and capability not in {"controlled_autonomous", "approved_write", "full_dev"}
+        ):
+            return PolicyResult(
+                route.risk,
+                "approval_required",
+                "Local verification commands require controlled autonomous capability or approval.",
+                route.execution_mode.value,
+                route.executor,
+                route.template_id,
+                route.capability.value,
+                True,
+            )
+        if route.execution_mode in {ExecutionMode.CLI_FAST, ExecutionMode.CLI_SANDBOXED}:
+            return PolicyResult(
+                route.risk,
+                "allow",
+                route.reason,
+                route.execution_mode.value,
+                route.executor,
+                route.template_id,
+                route.capability.value,
+                route.requires_approval,
+            )
+        if route.execution_mode == ExecutionMode.MCP_GOVERNED and not route.requires_approval:
+            return PolicyResult(
+                route.risk,
+                "allow",
+                route.reason,
+                route.execution_mode.value,
+                route.executor,
+                route.template_id,
+                route.capability.value,
+                route.requires_approval,
+            )
+
         tool = decision.tool
         plan_text = f"{decision.plan} {decision.args}".lower()
 
@@ -68,6 +142,12 @@ class PolicyGate:
         if tool in self.READ_ONLY_TOOLS:
             return PolicyResult("low", "allow", "Read-only tool is allowed.")
         if tool == "run_command":
+            if capability == "controlled_autonomous":
+                return PolicyResult(
+                    "medium",
+                    "allow",
+                    "Controlled autonomous mode may run commands after ToolBox whitelist validation.",
+                )
             if capability in {"approved_write", "full_dev"}:
                 return PolicyResult("medium", "approval_required", "Shell commands require approval.")
             return PolicyResult("medium", "approval_required", "Default read-only capability cannot run shell commands.")
@@ -75,9 +155,43 @@ class PolicyGate:
             return PolicyResult("network", "approval_required", "Network or proxy tools require explicit approval.")
         if tool in self.BROWSER_TOOLS:
             return PolicyResult("browser", "allow", "Browser open action is allowed for configured allowlist domains.")
+        if tool in self.EXTERNAL_AGENT_TOOLS:
+            return PolicyResult("external_state", "allow", "External Codex agent handoff uses governed adapter path.")
         if tool in self.WRITE_TOOLS:
             return PolicyResult("medium", "approval_required", "Write or patch actions require approval.")
         return PolicyResult("high", "deny", f"Unknown or unsupported tool: {tool}")
+
+    def _intent_from_decision(self, decision: ManagerDecision, capability: str) -> WorkIntent:
+        plan_text = f"{decision.plan} {decision.args}".lower()
+        tool = decision.tool
+        return WorkIntent(
+            goal=decision.plan,
+            action_type=self._action_type(tool),
+            tool_candidate=tool,
+            params=dict(decision.args),
+            read_only=tool in self.READ_ONLY_TOOLS or tool == "run_command",
+            network=tool in self.NETWORK_TOOLS or tool in self.BROWSER_TOOLS or tool in self.EXTERNAL_AGENT_TOOLS,
+            writes_files=tool in self.WRITE_TOOLS,
+            requires_credentials=tool in self.EXTERNAL_AGENT_TOOLS,
+            reads_secrets=any(word in plan_text for word in ["secret", "credential", "token", "密碼", "憑證"]),
+            destructive=any(word in plan_text for word in ["delete", "remove", "刪除", "清除"]),
+            approved=(
+                capability in {"approved_write", "full_dev", "external_governed"}
+                or tool in self.BROWSER_TOOLS
+                or (tool in self.EXTERNAL_AGENT_TOOLS and capability in {"controlled_autonomous", "external_governed"})
+            ),
+        )
+
+    def _action_type(self, tool: str) -> str:
+        if tool in self.READ_ONLY_TOOLS:
+            return "read_only"
+        if tool == "run_command":
+            return "local_verify"
+        if tool in self.NETWORK_TOOLS or tool in self.BROWSER_TOOLS or tool in self.EXTERNAL_AGENT_TOOLS:
+            return "external"
+        if tool in self.WRITE_TOOLS:
+            return "write"
+        return "unknown"
 
 
 class EnergyMonitor:
@@ -171,7 +285,18 @@ class BoundedLoopController:
             previous_action = action_key
 
             policy = self.policy_gate.evaluate(decision, self.limits.default_capability)
-            if policy.decision == "deny":
+            if policy.execution_mode == "PLAN_ONLY":
+                observation = Observation(
+                    True,
+                    "plan",
+                    (
+                        "已建立執行前規劃，尚未呼叫工具。\n"
+                        f"規劃：{decision.plan}\n"
+                        f"治理狀態：{policy.reason}"
+                    ),
+                )
+                stop_reason = "NEEDS_USER_INPUT"
+            elif policy.decision == "deny":
                 observation = Observation(False, decision.tool, policy.reason)
                 stop_reason = "POLICY_REJECTED"
             elif policy.decision == "approval_required":
@@ -292,7 +417,19 @@ class BoundedLoopController:
             "decision": "use_tool" if decision.tool != "none" else "ask_user",
             "reason": decision.plan,
             "tool_call": {"name": decision.tool, "args": dict(decision.args)},
-            "policy": {"risk": policy.risk, "decision": policy.decision, "reason": policy.reason},
+            "routing": {
+                "execution_mode": policy.execution_mode,
+                "executor": policy.executor,
+                "template_id": policy.template_id,
+                "reason": policy.reason,
+            },
+            "policy": {
+                "risk": policy.risk,
+                "decision": policy.decision,
+                "reason": policy.reason,
+                "requires_approval": policy.requires_approval,
+                "capability": policy.capability,
+            },
             "observation": {
                 "status": "ok" if observation.ok else "failed",
                 "summary": observation.content[:500],

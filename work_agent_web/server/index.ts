@@ -11,8 +11,29 @@ const __dirname = path.dirname(__filename);
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  app.use(express.json());
+  app.use(express.json({ limit: "15mb" }));
   const workspaceRoot = path.resolve(__dirname, "..", "..", "work_agent", "workspace");
+  const chatStatePath = path.resolve(__dirname, "..", "data", "chat-state.json");
+
+  app.get("/api/chat-state", async (_req, res) => {
+    try {
+      const state = await readChatState(chatStatePath);
+      res.json({ ok: true, state });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to read chat state.";
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  app.put("/api/chat-state", async (req, res) => {
+    try {
+      await writeChatState(chatStatePath, req.body?.state);
+      res.json({ ok: true });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to write chat state.";
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
 
   app.get("/api/workspace/tree", async (_req, res) => {
     try {
@@ -159,6 +180,32 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });
+}
+
+async function readChatState(chatStatePath: string): Promise<unknown | null> {
+  try {
+    const raw = await fs.readFile(chatStatePath, "utf8");
+    return JSON.parse(raw);
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+}
+
+async function writeChatState(chatStatePath: string, state: unknown): Promise<void> {
+  if (!state || typeof state !== "object") {
+    throw new Error("State payload is required.");
+  }
+  await fs.mkdir(path.dirname(chatStatePath), { recursive: true });
+  const tempPath = `${chatStatePath}.${process.pid}.tmp`;
+  await fs.writeFile(tempPath, JSON.stringify(state, null, 2), "utf8");
+  await fs.rename(tempPath, chatStatePath);
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error;
 }
 
 function resolveBackendModel(modelId: string): string | null {

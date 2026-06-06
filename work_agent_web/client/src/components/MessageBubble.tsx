@@ -1,6 +1,6 @@
 import { Message } from '@/types/chat';
 import { Button } from '@/components/ui/button';
-import { Copy, RotateCcw, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Copy, RotateCcw, ThumbsUp, ThumbsDown, Trash2 } from 'lucide-react';
 import { Streamdown } from 'streamdown';
 import { toast } from 'sonner';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -18,9 +18,10 @@ import { useLanguage } from '@/contexts/LanguageContext';
 
 interface MessageBubbleProps {
   message: Message;
+  onDelete: () => void;
 }
 
-export default function MessageBubble({ message }: MessageBubbleProps) {
+export default function MessageBubble({ message, onDelete }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const { t } = useLanguage();
 
@@ -57,44 +58,78 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
           )}
         </div>
 
+        {message.attachments?.length ? (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {message.attachments.map((attachment) => (
+              <div
+                key={attachment.id}
+                className="overflow-hidden rounded border border-current/20 bg-background/20"
+              >
+                {attachment.dataUrl && attachment.type?.startsWith("image/") ? (
+                  <img
+                    src={attachment.dataUrl}
+                    alt={attachment.name}
+                    className="h-32 w-full object-cover"
+                  />
+                ) : (
+                  <div className="p-2 text-xs">{attachment.name}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         {/* Message Actions */}
-        {!isUser && !message.isStreaming && (
+        {!message.isStreaming && (
           <div className="flex items-center gap-1 mt-2 pt-2 border-t border-current/20">
+            {!isUser && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCopy}
+                  className="h-6 px-2 text-xs"
+                  title={t("bubble.copy")}
+                >
+                  <Copy className="w-3 h-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handlePlaceholderAction(t("bubble.regenerateLabel"))}
+                  className="h-6 px-2 text-xs"
+                  title={t("bubble.regenerate")}
+                >
+                  <RotateCcw className="w-3 h-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handlePlaceholderAction(t("bubble.positiveLabel"))}
+                  className="h-6 px-2 text-xs"
+                  title={t("bubble.good")}
+                >
+                  <ThumbsUp className="w-3 h-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handlePlaceholderAction(t("bubble.negativeLabel"))}
+                  className="h-6 px-2 text-xs"
+                  title={t("bubble.bad")}
+                >
+                  <ThumbsDown className="w-3 h-3" />
+                </Button>
+              </>
+            )}
             <Button
               variant="ghost"
               size="sm"
-              onClick={handleCopy}
-              className="h-6 px-2 text-xs"
-              title={t("bubble.copy")}
+              onClick={onDelete}
+              className="h-6 px-2 text-xs hover:text-destructive"
+              title={t("bubble.delete")}
             >
-              <Copy className="w-3 h-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handlePlaceholderAction(t("bubble.regenerateLabel"))}
-              className="h-6 px-2 text-xs"
-              title={t("bubble.regenerate")}
-            >
-              <RotateCcw className="w-3 h-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handlePlaceholderAction(t("bubble.positiveLabel"))}
-              className="h-6 px-2 text-xs"
-              title={t("bubble.good")}
-            >
-              <ThumbsUp className="w-3 h-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handlePlaceholderAction(t("bubble.negativeLabel"))}
-              className="h-6 px-2 text-xs"
-              title={t("bubble.bad")}
-            >
-              <ThumbsDown className="w-3 h-3" />
+              <Trash2 className="w-3 h-3" />
             </Button>
           </div>
         )}

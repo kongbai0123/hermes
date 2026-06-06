@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 import shlex
 import subprocess
 import ipaddress
@@ -12,6 +13,8 @@ from pathlib import Path
 from typing import Callable
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
+
+from .external_chat import ExternalChatBridge, UnconfiguredExternalChatBridge, run_external_chat_loop
 
 
 @dataclass
@@ -35,6 +38,8 @@ class ToolBox:
         proxy_fetcher: Callable[[str, int, int], str] | None = None,
         allowed_browser_domains: list[str] | None = None,
         browser_opener: Callable[[str, str], None] | None = None,
+        external_codex_runner: Callable[[str, str], str] | None = None,
+        external_chat_bridge: ExternalChatBridge | None = None,
     ) -> None:
         self.workspace = Path(workspace_path).resolve()
         self.allowed_commands = allowed_commands
@@ -42,6 +47,8 @@ class ToolBox:
         self.proxy_fetcher = proxy_fetcher or self._default_proxy_fetcher
         self.allowed_browser_domains = [domain.lower() for domain in (allowed_browser_domains or [])]
         self.browser_opener = browser_opener or self._default_browser_opener
+        self.external_codex_runner = external_codex_runner
+        self.external_chat_bridge = external_chat_bridge or UnconfiguredExternalChatBridge()
         self.workspace.mkdir(parents=True, exist_ok=True)
 
     def _safe_path(self, path: str) -> Path:
@@ -174,6 +181,70 @@ class ToolBox:
         except Exception as exc:
             return Observation(False, "open_browser", str(exc))
 
+    def external_codex(self, topic: str, mode: str = "self_optimization_discussion") -> Observation:
+        safe_topic = (topic or "Codex 與 Hermes 自我優化討論").strip()[:2000]
+        safe_mode = (mode or "self_optimization_discussion").strip()[:120]
+        if safe_mode not in {"self_optimization_discussion", "architecture_review", "implementation_review"}:
+            return Observation(False, "external_codex", f"不支援的 external_codex mode：{safe_mode}")
+
+        try:
+            if self.external_codex_runner is not None:
+                result = self.external_codex_runner(safe_topic, safe_mode)
+                return Observation(True, "external_codex", result[:8000])
+            payload = {
+                "status": "handoff_ready",
+                "tool": "external_codex",
+                "mode": safe_mode,
+                "topic": safe_topic,
+                "instruction": "請外部 Codex 針對 topic 執行自我優化討論，回傳可執行建議、風險與實作順序。",
+            }
+            return Observation(True, "external_codex", json.dumps(payload, ensure_ascii=False, indent=2))
+        except Exception as exc:
+            return Observation(False, "external_codex", str(exc))
+
+    def external_chat(self, message: str, target: str = "chatgpt_web") -> Observation:
+        safe_message = (message or "").strip()
+        safe_target = (target or "chatgpt_web").strip()
+        if not safe_message:
+            return Observation(False, "external_chat", "external_chat 需要 message。")
+        if safe_target not in {"chatgpt_web", "codex_web", "gpt_web"}:
+            return Observation(False, "external_chat", f"不支援的 external_chat target：{safe_target}")
+
+        try:
+            result = self.external_chat_bridge.send_and_receive(safe_message, target=safe_target)
+            return Observation(result.ok, "external_chat", result.to_json()[:8000])
+        except Exception as exc:
+            return Observation(False, "external_chat", str(exc))
+
+    def external_chat_loop(
+        self,
+        message: str,
+        target: str = "chatgpt_web",
+        max_turns: int | str = 3,
+    ) -> Observation:
+        safe_message = (message or "").strip()
+        safe_target = (target or "chatgpt_web").strip()
+        if not safe_message:
+            return Observation(False, "external_chat_loop", "external_chat_loop 需要 message。")
+        if safe_target not in {"chatgpt_web", "codex_web", "gpt_web"}:
+            return Observation(False, "external_chat_loop", f"不支援的 external_chat_loop target：{safe_target}")
+
+        try:
+            safe_max_turns = max(1, min(int(max_turns), 8))
+        except ValueError:
+            return Observation(False, "external_chat_loop", "max_turns 必須是整數。")
+
+        try:
+            result = run_external_chat_loop(
+                self.external_chat_bridge,
+                safe_message,
+                target=safe_target,
+                max_turns=safe_max_turns,
+            )
+            return Observation(result.ok, "external_chat_loop", result.to_json()[:8000])
+        except Exception as exc:
+            return Observation(False, "external_chat_loop", str(exc))
+
     def _validate_url(self, url: str, allowed_domains: list[str], tool_name: str) -> str | None:
         parsed = urlparse(url)
         if parsed.scheme not in {"http", "https"}:
@@ -284,4 +355,20 @@ class ToolBox:
             )
         if name == "open_browser":
             return self.open_browser(kwargs.get("url", ""), kwargs.get("browser", "chrome"))
+        if name == "external_codex":
+            return self.external_codex(
+                kwargs.get("topic", ""),
+                kwargs.get("mode", "self_optimization_discussion"),
+            )
+        if name == "external_chat":
+            return self.external_chat(
+                kwargs.get("message", ""),
+                kwargs.get("target", "chatgpt_web"),
+            )
+        if name == "external_chat_loop":
+            return self.external_chat_loop(
+                kwargs.get("message", ""),
+                kwargs.get("target", "chatgpt_web"),
+                kwargs.get("max_turns", "3"),
+            )
         return Observation(False, name, "未知工具。")

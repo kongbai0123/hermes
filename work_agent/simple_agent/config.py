@@ -13,7 +13,7 @@ DEFAULT_CONFIG = {
     "max_replans": 2,
     "max_tool_failures": 2,
     "max_same_action_repeat": 1,
-    "default_capability": "read_only",
+    "default_capability": "controlled_autonomous",
     "allowed_commands": [
         "python --version",
         "python -m pytest",
@@ -24,6 +24,12 @@ DEFAULT_CONFIG = {
     "allowed_browser_domains": [
         "youtube.com"
     ],
+    "external_chat_bridge": {
+        "enabled": True,
+        "mode": "windows_clipboard",
+        "window_title": "Google Chrome",
+        "wait_seconds": 20
+    },
 }
 
 

@@ -5,8 +5,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Send, Paperclip, Square } from "lucide-react";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
-import { Message } from "@/types/chat";
+import { Attachment, Message } from "@/types/chat";
 import { useLanguage } from "@/contexts/LanguageContext";
+import {
+  attachmentsToPromptNote,
+  clipboardItemsToImageAttachments,
+  imageFileToAttachment,
+} from "@/lib/attachments";
 
 /**
  * MessageComposer: Input area for sending messages
@@ -22,12 +27,15 @@ export default function MessageComposer() {
   const { state, dispatch, currentChat } = useChat();
   const { t } = useLanguage();
   const [input, setInput] = useState('');
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleSendMessage = async () => {
-    if (!input.trim() || !currentChat || isLoading) return;
+    if ((!input.trim() && attachments.length === 0) || !currentChat || isLoading) return;
     const prompt = input.trim();
+    const messageAttachments = attachments;
 
     // Add user message
     const userMessage: Message = {
@@ -36,6 +44,7 @@ export default function MessageComposer() {
       role: 'user',
       content: prompt,
       createdAt: new Date(),
+      attachments: messageAttachments,
     };
 
     dispatch({ type: 'ADD_MESSAGE', payload: userMessage });
@@ -63,6 +72,7 @@ export default function MessageComposer() {
       },
     });
     setInput('');
+    setAttachments([]);
     setIsLoading(true);
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -72,7 +82,7 @@ export default function MessageComposer() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt,
+          prompt: `${prompt}${attachmentsToPromptNote(messageAttachments)}`,
           model: currentChat.settings.model,
         }),
         signal: controller.signal,
@@ -228,21 +238,60 @@ export default function MessageComposer() {
     }
   };
 
+  const handlePaste = async (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const pastedImages = await clipboardItemsToImageAttachments(event.clipboardData.items);
+    if (!pastedImages.length) return;
+
+    event.preventDefault();
+    setAttachments((current) => [...current, ...pastedImages]);
+    toast.success(`${pastedImages.length} image attached`);
+  };
+
   const handleAttachClick = () => {
-    toast.info(t("toast.attachmentDisabled"));
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []).filter((file) => file.type.startsWith("image/"));
+    if (!files.length) return;
+
+    const nextAttachments = await Promise.all(files.map((file) => imageFileToAttachment(file)));
+    setAttachments((current) => [...current, ...nextAttachments]);
+    event.target.value = "";
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachments((current) => current.filter((attachment) => attachment.id !== id));
   };
 
   return (
     <div className="space-y-3">
-      {/* Attached Files (placeholder) */}
-      {/* <div className="flex gap-2 flex-wrap">
-        {attachments.map((file) => (
-          <div key={file.id} className="flex items-center gap-2 px-3 py-1 bg-secondary rounded-full text-sm">
-            <span>{file.name}</span>
-            <button onClick={() => removeAttachment(file.id)}>×</button>
-          </div>
-        ))}
-      </div> */}
+      {attachments.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {attachments.map((file) => (
+            <div
+              key={file.id}
+              className="relative h-20 w-24 shrink-0 overflow-hidden rounded border border-border bg-secondary"
+            >
+              {file.dataUrl ? (
+                <img src={file.dataUrl} alt={file.name} className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full items-center justify-center px-2 text-xs text-muted-foreground">
+                  {file.name}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => removeAttachment(file.id)}
+                className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded bg-background/90 text-xs text-foreground shadow"
+                aria-label={`Remove ${file.name}`}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Input Area */}
       <div className="flex gap-3">
@@ -250,12 +299,21 @@ export default function MessageComposer() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder={t("composer.placeholder")}
           className="flex-1 resize-none max-h-32"
           disabled={isLoading}
         />
 
         <div className="flex flex-col gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handleFileChange}
+          />
           <Button
             variant="outline"
             size="icon"
@@ -278,7 +336,7 @@ export default function MessageComposer() {
           ) : (
             <Button
               onClick={handleSendMessage}
-              disabled={!input.trim() || isLoading}
+              disabled={(!input.trim() && attachments.length === 0) || isLoading}
               size="icon"
               className="bg-primary hover:bg-primary/90"
               title={t("composer.send")}

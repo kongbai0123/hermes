@@ -8,6 +8,19 @@ from .llm import OllamaClient
 from .loop import AgentLoop
 from .roles import ManagerModel, WorkerModel
 from .tools import ToolBox
+from .external_chat import WindowsClipboardExternalChatBridge
+
+
+def build_external_chat_bridge(config: dict):
+    bridge_config = dict(config.get("external_chat_bridge", {}))
+    if not bridge_config.get("enabled", False):
+        return None
+    if bridge_config.get("mode") != "windows_clipboard":
+        return None
+    return WindowsClipboardExternalChatBridge(
+        window_title=str(bridge_config.get("window_title", "Google Chrome")),
+        wait_seconds=int(bridge_config.get("wait_seconds", 20)),
+    )
 
 
 def build_agent(model_override: str | None = None) -> AgentLoop:
@@ -18,6 +31,7 @@ def build_agent(model_override: str | None = None) -> AgentLoop:
         config["allowed_commands"],
         allowed_proxy_domains=list(config.get("allowed_proxy_domains", [])),
         allowed_browser_domains=list(config.get("allowed_browser_domains", [])),
+        external_chat_bridge=build_external_chat_bridge(config),
     )
     limits = LoopLimits(
         max_steps=int(config.get("max_steps", 6)),
