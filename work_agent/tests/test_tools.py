@@ -1,6 +1,8 @@
+import json
 from pathlib import Path
 
 from simple_agent.external_chat import FakeExternalChatBridge
+from simple_agent.gui_agent import MockGuiRunner
 from simple_agent.tools import ToolBox
 
 
@@ -156,3 +158,91 @@ def test_external_chat_loop_execute_uses_default_target(tmp_path: Path) -> None:
 
     assert result.ok is True
     assert bridge.sent_messages == [("chatgpt_web", "HI")]
+
+
+def test_self_improve_proposal_only_returns_patch_plan_without_writing(tmp_path: Path) -> None:
+    tools = ToolBox(str(tmp_path), ["python --version"])
+
+    result = tools.self_improve(
+        goal="讓 Hermes 可以修改自己的工具能力",
+        scope="simple_agent",
+        mode="proposal_only",
+    )
+    payload = json.loads(result.content)
+
+    assert result.ok is True
+    assert result.tool == "self_improve"
+    assert payload["status"] == "proposal_ready"
+    assert payload["mode"] == "proposal_only"
+    assert payload["requires_approval"] is True
+    assert "tools.py" in " ".join(payload["candidate_files"])
+    assert payload["tests_to_run"]
+
+
+def test_self_improve_rejects_scope_outside_hermes_code(tmp_path: Path) -> None:
+    tools = ToolBox(str(tmp_path), ["python --version"])
+
+    result = tools.self_improve(
+        goal="讀取 secrets",
+        scope="../",
+        mode="proposal_only",
+    )
+
+    assert result.ok is False
+    assert "Hermes 程式範圍" in result.content
+
+
+def test_self_improve_apply_mode_reports_approval_boundary(tmp_path: Path) -> None:
+    tools = ToolBox(str(tmp_path), ["python --version"])
+
+    result = tools.self_improve(
+        goal="套用自我修改",
+        scope="simple_agent",
+        mode="apply_after_approval",
+    )
+    payload = json.loads(result.content)
+
+    assert result.ok is False
+    assert payload["status"] == "approval_required"
+    assert payload["requires_approval"] is True
+
+
+def test_gui_observe_uses_mock_runner(tmp_path: Path) -> None:
+    tools = ToolBox(str(tmp_path), ["python --version"], gui_runner=MockGuiRunner())
+
+    result = tools.gui_observe()
+    payload = json.loads(result.content)
+
+    assert result.ok is True
+    assert result.tool == "gui_observe"
+    assert payload["status"] == "observed"
+    assert payload["screen_id"] == "mock_screen_001"
+
+
+def test_gui_verify_uses_mock_runner(tmp_path: Path) -> None:
+    tools = ToolBox(str(tmp_path), ["python --version"], gui_runner=MockGuiRunner())
+
+    result = tools.execute("gui_verify", condition="chat_prompt_visible")
+    payload = json.loads(result.content)
+
+    assert result.ok is True
+    assert result.tool == "gui_verify"
+    assert payload["condition"] == "chat_prompt_visible"
+    assert payload["matched"] is True
+
+
+def test_gui_observe_reports_unavailable_runner(tmp_path: Path) -> None:
+    class UnavailableRunner:
+        def observe(self) -> str:
+            raise RuntimeError("desktop bridge unavailable")
+
+        def verify(self, condition: str) -> str:
+            raise RuntimeError("desktop bridge unavailable")
+
+    tools = ToolBox(str(tmp_path), ["python --version"], gui_runner=UnavailableRunner())
+
+    result = tools.gui_observe()
+
+    assert result.ok is False
+    assert result.tool == "gui_observe"
+    assert "tool_unavailable" in result.content

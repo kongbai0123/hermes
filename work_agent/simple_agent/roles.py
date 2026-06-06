@@ -24,11 +24,12 @@ class ManagerModel:
         prompt = (
             "你是 Manager Model。請把使用者任務轉成簡單決策。\n"
             "只能輸出 JSON，不要 markdown。\n"
-            "JSON 格式：{\"plan\":\"...\",\"worker\":\"file|search|test|external|explain\","
-            "\"tool\":\"list_files|read_file|search_text|run_command|proxy_fetch|open_browser|external_codex|external_chat|external_chat_loop|none\","
+            "JSON 格式：{\"plan\":\"...\",\"worker\":\"file|search|test|external|self_development|explain\","
+            "\"tool\":\"list_files|read_file|search_text|run_command|proxy_fetch|open_browser|external_codex|external_chat|external_chat_loop|self_improve|none\","
             "\"args\":{\"path\":\"...\",\"keyword\":\"...\",\"command\":\"...\",\"url\":\"...\","
             "\"browser\":\"chrome\",\"topic\":\"...\",\"mode\":\"self_optimization_discussion\","
-            "\"message\":\"...\",\"target\":\"chatgpt_web\",\"max_turns\":\"3\"}}\n"
+            "\"message\":\"...\",\"target\":\"chatgpt_web\",\"max_turns\":\"3\","
+            "\"goal\":\"...\",\"scope\":\"simple_agent\"}}\n"
             "若使用者要看結構，用 list_files。若要讀檔，用 read_file。"
             "若要找關鍵字，用 search_text。若要跑測試或版本，用 run_command。"
             "若使用者明確要求網路 proxy 或抓取外部 URL，用 proxy_fetch，args 必須包含 url。"
@@ -41,6 +42,8 @@ class ManagerModel:
             "用 external_chat，args 必須包含 message 與 target=chatgpt_web。"
             "若使用者要求與外部 model 多輪、來回、連續聊天，"
             "用 external_chat_loop，args 必須包含 message、target=chatgpt_web 與 max_turns。"
+            "若使用者要求 Hermes 修改、優化、開發自己的程式，"
+            "用 self_improve，args 必須包含 goal、scope=simple_agent 與 mode=proposal_only。"
         )
         try:
             raw = self.llm.chat(
@@ -84,6 +87,19 @@ class ManagerModel:
                 "external",
                 "external_chat",
                 {"message": message, "target": "chatgpt_web"},
+            )
+        if "hermes" in text and "codex" not in text and any(
+            word in text for word in ["修改", "優化", "開發", "自己", "自身", "自我"]
+        ):
+            return ManagerDecision(
+                "建立 Hermes 自我開發提案，先檢查自身程式並產生 patch proposal。",
+                "self_development",
+                "self_improve",
+                {
+                    "goal": user_text,
+                    "scope": "simple_agent",
+                    "mode": "proposal_only",
+                },
             )
         if "codex" in text and any(word in text for word in ["hermes", "優化", "評估", "討論", "代理", "執行"]):
             return ManagerDecision(

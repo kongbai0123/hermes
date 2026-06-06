@@ -2,16 +2,31 @@ import { useRef, useState } from "react";
 import { useChat } from "@/contexts/ChatContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Paperclip, Square } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  Mic,
+  Paperclip,
+  Send,
+  ShieldCheck,
+  Square,
+} from "lucide-react";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
-import { Attachment, Message } from "@/types/chat";
+import { Attachment, ChatSettings, Message, ReasoningLevel, ResponseSpeed } from "@/types/chat";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
   attachmentsToPromptNote,
   clipboardItemsToImageAttachments,
   imageFileToAttachment,
 } from "@/lib/attachments";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 /**
  * MessageComposer: Input area for sending messages
@@ -23,6 +38,19 @@ import {
  * - Keyboard shortcuts (Enter to send, Shift+Enter for newline)
  */
 
+const REASONING_OPTIONS: Array<{ value: ReasoningLevel; label: string }> = [
+  { value: "low", label: "低" },
+  { value: "medium", label: "中" },
+  { value: "high", label: "高" },
+  { value: "ultra", label: "超高" },
+];
+
+const SPEED_OPTIONS: Array<{ value: ResponseSpeed; label: string }> = [
+  { value: "slow", label: "慢" },
+  { value: "standard", label: "標準" },
+  { value: "fast", label: "快" },
+];
+
 export default function MessageComposer() {
   const { state, dispatch, currentChat } = useChat();
   const { t } = useLanguage();
@@ -31,6 +59,66 @@ export default function MessageComposer() {
   const [isLoading, setIsLoading] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const currentModel = state.models.find((model) => model.id === currentChat?.settings.model);
+  const currentReasoning =
+    REASONING_OPTIONS.find((option) => option.value === currentChat?.settings.reasoningLevel) ??
+    REASONING_OPTIONS[1];
+  const currentSpeed =
+    SPEED_OPTIONS.find((option) => option.value === currentChat?.settings.responseSpeed) ??
+    SPEED_OPTIONS[1];
+
+  const addSettingTimelineMessage = (content: string) => {
+    if (!currentChat) return;
+    dispatch({
+      type: "ADD_MESSAGE",
+      payload: {
+        id: nanoid(),
+        chatId: currentChat.id,
+        role: "system",
+        content,
+        createdAt: new Date(),
+      },
+    });
+  };
+
+  const updateSettingsWithTimeline = (
+    settings: Partial<ChatSettings>,
+    timelineMessage: string
+  ) => {
+    if (!currentChat) return;
+    dispatch({
+      type: "UPDATE_CHAT_SETTINGS",
+      payload: {
+        chatId: currentChat.id,
+        settings,
+      },
+    });
+    addSettingTimelineMessage(timelineMessage);
+  };
+
+  const handleModelChange = (modelId: string) => {
+    const model = state.models.find((item) => item.id === modelId);
+    if (!model || !currentChat || model.id === currentChat.settings.model) return;
+    updateSettingsWithTimeline(
+      {
+        model: model.id,
+        provider: model.provider,
+      },
+      `模型已切換至 ${model.name}`
+    );
+  };
+
+  const handleReasoningChange = (reasoningLevel: ReasoningLevel) => {
+    const option = REASONING_OPTIONS.find((item) => item.value === reasoningLevel);
+    if (!option || !currentChat || reasoningLevel === currentChat.settings.reasoningLevel) return;
+    updateSettingsWithTimeline({ reasoningLevel }, `推理已切換至 ${option.label}`);
+  };
+
+  const handleSpeedChange = (responseSpeed: ResponseSpeed) => {
+    const option = SPEED_OPTIONS.find((item) => item.value === responseSpeed);
+    if (!option || !currentChat || responseSpeed === currentChat.settings.responseSpeed) return;
+    updateSettingsWithTimeline({ responseSpeed }, `速度已切換至 ${option.label}`);
+  };
 
   const handleSendMessage = async () => {
     if ((!input.trim() && attachments.length === 0) || !currentChat || isLoading) return;
@@ -84,6 +172,8 @@ export default function MessageComposer() {
         body: JSON.stringify({
           prompt: `${prompt}${attachmentsToPromptNote(messageAttachments)}`,
           model: currentChat.settings.model,
+          reasoningLevel: currentChat.settings.reasoningLevel,
+          responseSpeed: currentChat.settings.responseSpeed,
         }),
         signal: controller.signal,
       });
@@ -293,19 +383,18 @@ export default function MessageComposer() {
         </div>
       )}
 
-      {/* Input Area */}
-      <div className="flex gap-3">
+      <div className="rounded-2xl border border-border bg-card shadow-sm">
         <Textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           placeholder={t("composer.placeholder")}
-          className="flex-1 resize-none max-h-32"
+          className="max-h-40 min-h-24 resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
           disabled={isLoading}
         />
 
-        <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2 border-t border-border/70 px-3 py-2">
           <input
             ref={fileInputRef}
             type="file"
@@ -315,13 +404,98 @@ export default function MessageComposer() {
             onChange={handleFileChange}
           />
           <Button
-            variant="outline"
-            size="icon"
+            variant="ghost"
+            size="icon-sm"
             title={t("composer.attach")}
             disabled={isLoading}
             onClick={handleAttachClick}
           >
             <Paperclip className="w-4 h-4" />
+          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-1 text-amber-600">
+                <ShieldCheck className="w-4 h-4" />
+                <span className="hidden sm:inline">{currentChat?.workbench.safetyModeLabel ?? "完整存取權"}</span>
+                <ChevronDown className="w-3 h-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+              <DropdownMenuLabel>授權</DropdownMenuLabel>
+              <DropdownMenuItem disabled>
+                {currentChat?.workbench.safetyModeLabel ?? "完整存取權"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <div className="flex-1" />
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-1">
+                <span>{currentModel?.name ?? currentChat?.settings.model ?? "模型"}</span>
+                <ChevronDown className="w-3 h-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>模型</DropdownMenuLabel>
+              {state.models.map((model) => (
+                <DropdownMenuItem key={model.id} onClick={() => handleModelChange(model.id)}>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-medium">{model.name}</div>
+                    <div className="truncate text-xs text-muted-foreground">{model.provider}</div>
+                  </div>
+                  {model.id === currentChat?.settings.model ? <Check className="w-4 h-4" /> : null}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-1">
+                <span>推理 {currentReasoning.label}</span>
+                <ChevronDown className="w-3 h-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-36">
+              <DropdownMenuLabel>推理</DropdownMenuLabel>
+              {REASONING_OPTIONS.map((option) => (
+                <DropdownMenuItem key={option.value} onClick={() => handleReasoningChange(option.value)}>
+                  <span className="flex-1">{option.label}</span>
+                  {option.value === currentChat?.settings.reasoningLevel ? <Check className="w-4 h-4" /> : null}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-1">
+                <span>速度 {currentSpeed.label}</span>
+                <ChevronDown className="w-3 h-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-36">
+              <DropdownMenuLabel>速度</DropdownMenuLabel>
+              {SPEED_OPTIONS.map((option) => (
+                <DropdownMenuItem key={option.value} onClick={() => handleSpeedChange(option.value)}>
+                  <span className="flex-1">{option.label}</span>
+                  {option.value === currentChat?.settings.responseSpeed ? <Check className="w-4 h-4" /> : null}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title="語音輸入"
+            disabled={isLoading}
+            onClick={() => toast.info("語音輸入尚未啟用")}
+          >
+            <Mic className="w-4 h-4" />
           </Button>
 
           {isLoading ? (
@@ -330,6 +504,7 @@ export default function MessageComposer() {
               size="icon"
               onClick={handleStop}
               title={t("composer.stop")}
+              className="rounded-full"
             >
               <Square className="w-4 h-4" />
             </Button>
@@ -338,7 +513,7 @@ export default function MessageComposer() {
               onClick={handleSendMessage}
               disabled={(!input.trim() && attachments.length === 0) || isLoading}
               size="icon"
-              className="bg-primary hover:bg-primary/90"
+              className="rounded-full bg-primary hover:bg-primary/90"
               title={t("composer.send")}
             >
               <Send className="w-4 h-4" />

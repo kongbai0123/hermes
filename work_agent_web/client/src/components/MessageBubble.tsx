@@ -23,6 +23,7 @@ interface MessageBubbleProps {
 
 export default function MessageBubble({ message, onDelete }: MessageBubbleProps) {
   const isUser = message.role === 'user';
+  const isSystem = message.role === "system";
   const { t } = useLanguage();
 
   const handleCopy = () => {
@@ -35,10 +36,12 @@ export default function MessageBubble({ message, onDelete }: MessageBubbleProps)
   };
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} message-enter`}>
+    <div className={`flex ${isSystem ? "justify-center" : isUser ? 'justify-end' : 'justify-start'} message-enter`}>
       <div
         className={`max-w-2xl rounded-lg px-4 py-3 ${
-          isUser
+          isSystem
+            ? "border border-border bg-muted/60 px-3 py-1.5 text-xs text-muted-foreground"
+            : isUser
             ? 'bg-primary text-primary-foreground rounded-br-none'
             : 'bg-secondary text-foreground rounded-bl-none'
         }`}
@@ -80,7 +83,7 @@ export default function MessageBubble({ message, onDelete }: MessageBubbleProps)
         ) : null}
 
         {/* Message Actions */}
-        {!message.isStreaming && (
+        {!message.isStreaming && !isSystem && (
           <div className="flex items-center gap-1 mt-2 pt-2 border-t border-current/20">
             {!isUser && (
               <>

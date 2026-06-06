@@ -306,3 +306,53 @@ def test_bounded_loop_uses_external_chat_loop_turns_as_observation(tmp_path: Pat
     assert result["trace"][0]["routing"]["execution_mode"] == "MCP_GOVERNED"
     assert result["trace"][0]["policy"]["decision"] == "allow"
     assert len(bridge.sent_messages) == 2
+
+
+def test_bounded_loop_denies_gui_observe_in_plan_only_capability(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    controller = make_controller(
+        workspace,
+        [ManagerDecision("觀察外部桌面 UI。", "gui", "gui_observe", {})],
+        default_capability="plan_only",
+    )
+
+    result = controller.run("觀察外部 GPT 畫面")
+
+    assert result["stop_reason"] == "POLICY_REJECTED"
+    assert result["trace"][0]["policy"]["risk"] == "gui_observe"
+    assert result["trace"][0]["policy"]["decision"] == "deny"
+
+
+def test_bounded_loop_allows_gui_observe_in_read_only_capability(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    controller = make_controller(
+        workspace,
+        [ManagerDecision("觀察外部桌面 UI。", "gui", "gui_observe", {})],
+        default_capability="read_only",
+    )
+
+    result = controller.run("觀察外部 GPT 畫面")
+
+    assert result["stop_reason"] == "DONE"
+    assert result["observation"]["ok"] is True
+    assert result["observation"]["tool"] == "gui_observe"
+    assert result["trace"][0]["policy"]["risk"] == "gui_observe"
+    assert result["trace"][0]["policy"]["decision"] == "allow"
+
+
+def test_bounded_loop_requires_approval_for_gui_click_in_controlled_autonomous(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    controller = make_controller(
+        workspace,
+        [ManagerDecision("點擊外部 GPT 送出按鈕。", "gui", "gui_click", {"target": "send_button"})],
+        default_capability="controlled_autonomous",
+    )
+
+    result = controller.run("點擊外部 GPT 送出按鈕")
+
+    assert result["stop_reason"] == "NEEDS_USER_APPROVAL"
+    assert result["trace"][0]["policy"]["risk"] == "gui_action"
+    assert result["trace"][0]["policy"]["decision"] == "approval_required"

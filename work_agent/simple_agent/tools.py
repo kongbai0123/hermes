@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from .external_chat import ExternalChatBridge, UnconfiguredExternalChatBridge, run_external_chat_loop
+from .gui_agent import GuiRunner, MockGuiRunner
 
 
 @dataclass
@@ -40,6 +41,7 @@ class ToolBox:
         browser_opener: Callable[[str, str], None] | None = None,
         external_codex_runner: Callable[[str, str], str] | None = None,
         external_chat_bridge: ExternalChatBridge | None = None,
+        gui_runner: GuiRunner | None = None,
     ) -> None:
         self.workspace = Path(workspace_path).resolve()
         self.allowed_commands = allowed_commands
@@ -49,6 +51,7 @@ class ToolBox:
         self.browser_opener = browser_opener or self._default_browser_opener
         self.external_codex_runner = external_codex_runner
         self.external_chat_bridge = external_chat_bridge or UnconfiguredExternalChatBridge()
+        self.gui_runner = gui_runner or MockGuiRunner()
         self.workspace.mkdir(parents=True, exist_ok=True)
 
     def _safe_path(self, path: str) -> Path:
@@ -245,6 +248,148 @@ class ToolBox:
         except Exception as exc:
             return Observation(False, "external_chat_loop", str(exc))
 
+    def self_improve(
+        self,
+        goal: str,
+        scope: str = "simple_agent",
+        mode: str = "proposal_only",
+        max_files: int | str = 8,
+    ) -> Observation:
+        safe_goal = (goal or "改善 Hermes 自身能力").strip()[:2000]
+        safe_scope = (scope or "simple_agent").strip().replace("\\", "/")
+        safe_mode = (mode or "proposal_only").strip()
+        if safe_mode not in {"proposal_only", "apply_after_approval"}:
+            return Observation(False, "self_improve", f"不支援的 self_improve mode：{safe_mode}")
+
+        try:
+            safe_max_files = max(1, min(int(max_files), 20))
+        except ValueError:
+            return Observation(False, "self_improve", "max_files 必須是整數。")
+
+        if safe_mode == "apply_after_approval":
+            payload = {
+                "ok": False,
+                "status": "approval_required",
+                "mode": safe_mode,
+                "goal": safe_goal,
+                "scope": safe_scope,
+                "requires_approval": True,
+                "reason": "Hermes 自我修改會寫入自身程式，必須先取得使用者明確批准。",
+            }
+            return Observation(False, "self_improve", json.dumps(payload, ensure_ascii=False, indent=2))
+
+        try:
+            hermes_root = Path(__file__).resolve().parents[1]
+            target = (hermes_root / safe_scope).resolve()
+            try:
+                target.relative_to(hermes_root)
+            except ValueError as exc:
+                raise PermissionError("self_improve 只允許檢查 Hermes 程式範圍內的檔案。") from exc
+            if not target.exists():
+                return Observation(False, "self_improve", f"找不到 Hermes 程式範圍：{safe_scope}")
+
+            candidate_files = self._self_improve_candidate_files(target, hermes_root, safe_max_files)
+            payload = {
+                "ok": True,
+                "status": "proposal_ready",
+                "mode": safe_mode,
+                "goal": safe_goal,
+                "scope": safe_scope,
+                "requires_approval": True,
+                "candidate_files": candidate_files,
+                "findings": self._self_improve_findings(safe_goal, candidate_files),
+                "plan": [
+                    "定位與 goal 相關的 Hermes 模組與測試。",
+                    "先補失敗測試描述期望行為。",
+                    "產生最小 patch，避免無關重構。",
+                    "跑 focused tests，再跑完整 backend tests。",
+                    "若測試通過，回報 touched files、風險與下一步。",
+                ],
+                "patch_summary": "proposal_only 不會寫入檔案；實際修改需使用者批准後才可套用。",
+                "tests_to_run": [
+                    "python -m pytest tests/test_tools.py tests/test_work_execution.py tests/test_roles.py -q",
+                    "python -m pytest tests -q",
+                ],
+                "write_policy": "apply_after_approval requires explicit approval",
+            }
+            return Observation(True, "self_improve", json.dumps(payload, ensure_ascii=False, indent=2)[:8000])
+        except Exception as exc:
+            return Observation(False, "self_improve", str(exc))
+
+    def gui_observe(self) -> Observation:
+        try:
+            return Observation(True, "gui_observe", self.gui_runner.observe()[:8000])
+        except Exception as exc:
+            payload = {
+                "ok": False,
+                "status": "tool_unavailable",
+                "tool": "gui_observe",
+                "reason": str(exc),
+            }
+            return Observation(False, "gui_observe", json.dumps(payload, ensure_ascii=False))
+
+    def gui_verify(self, condition: str) -> Observation:
+        safe_condition = (condition or "").strip()
+        if not safe_condition:
+            return Observation(False, "gui_verify", "gui_verify 需要 condition。")
+        try:
+            return Observation(True, "gui_verify", self.gui_runner.verify(safe_condition)[:8000])
+        except Exception as exc:
+            payload = {
+                "ok": False,
+                "status": "tool_unavailable",
+                "tool": "gui_verify",
+                "condition": safe_condition,
+                "reason": str(exc),
+            }
+            return Observation(False, "gui_verify", json.dumps(payload, ensure_ascii=False))
+
+    def gui_action_placeholder(self, tool_name: str, **kwargs: str) -> Observation:
+        payload = {
+            "ok": False,
+            "status": "approval_required",
+            "tool": tool_name,
+            "args": dict(kwargs),
+            "reason": "GUI action tools require explicit approval and a real governed runner before execution.",
+        }
+        return Observation(False, tool_name, json.dumps(payload, ensure_ascii=False))
+
+    def _self_improve_candidate_files(self, target: Path, hermes_root: Path, max_files: int) -> list[str]:
+        files = [target] if target.is_file() else target.rglob("*")
+        candidates: list[str] = []
+        file_paths: list[Path] = []
+        for file_path in files:
+            if not file_path.is_file():
+                continue
+            if any(part in {"__pycache__", ".pytest_cache", "dist"} for part in file_path.parts):
+                continue
+            if file_path.suffix not in {".py", ".md", ".json"}:
+                continue
+            file_paths.append(file_path)
+
+        priority = {"simple_agent/tools.py": 0, "simple_agent/work_execution.py": 1, "simple_agent/bounded_loop.py": 2}
+        for file_path in sorted(
+            file_paths,
+            key=lambda path: (priority.get(path.relative_to(hermes_root).as_posix(), 99), path.as_posix()),
+        ):
+            candidates.append(file_path.relative_to(hermes_root).as_posix())
+            if len(candidates) >= max_files:
+                break
+        return candidates
+
+    def _self_improve_findings(self, goal: str, candidate_files: list[str]) -> list[str]:
+        findings = [
+            "目前 Hermes 自我開發必須先產生 proposal，不能直接改寫自身程式。",
+            "實際修改需要走 approval boundary，避免無限制 self-write。",
+        ]
+        if any("tools.py" in file for file in candidate_files):
+            findings.append("ToolBox 是新增自我開發工具入口的主要候選位置。")
+        if any("work_execution.py" in file for file in candidate_files):
+            findings.append("WorkSkillRouter / PolicyGate 需要明確區分 proposal_only 與 apply_after_approval。")
+        if "測試" in goal or "test" in goal.lower():
+            findings.append("此 goal 涉及測試，應先新增 failing test 再實作。")
+        return findings
+
     def _validate_url(self, url: str, allowed_domains: list[str], tool_name: str) -> str | None:
         parsed = urlparse(url)
         if parsed.scheme not in {"http", "https"}:
@@ -371,4 +516,17 @@ class ToolBox:
                 kwargs.get("target", "chatgpt_web"),
                 kwargs.get("max_turns", "3"),
             )
+        if name == "self_improve":
+            return self.self_improve(
+                kwargs.get("goal", ""),
+                kwargs.get("scope", "simple_agent"),
+                kwargs.get("mode", "proposal_only"),
+                kwargs.get("max_files", "8"),
+            )
+        if name == "gui_observe":
+            return self.gui_observe()
+        if name == "gui_verify":
+            return self.gui_verify(kwargs.get("condition", ""))
+        if name in {"gui_click", "gui_type_text", "gui_hotkey", "gui_wait"}:
+            return self.gui_action_placeholder(name, **kwargs)
         return Observation(False, name, "未知工具。")

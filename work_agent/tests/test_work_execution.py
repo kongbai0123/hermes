@@ -134,6 +134,109 @@ def test_router_routes_external_chat_loop_to_mcp_governed_path() -> None:
     assert decision.executor == "mcp_bridge"
 
 
+def test_router_allows_self_improve_proposal_only_as_patch_proposal() -> None:
+    intent = WorkIntent(
+        goal="let Hermes improve its own tool code",
+        action_type="self_improve",
+        tool_candidate="self_improve",
+        params={"goal": "改善 Hermes 工具能力", "scope": "simple_agent", "mode": "proposal_only"},
+        read_only=True,
+        network=False,
+        writes_files=False,
+        requires_credentials=False,
+        approved=False,
+    )
+
+    decision = WorkSkillRouter(CommandTemplateRegistry.default()).route(intent)
+
+    assert decision.execution_mode == ExecutionMode.CLI_FAST
+    assert decision.policy_decision == PolicyDecision.ALLOW
+    assert decision.capability == CapabilityLevel.L3_PATCH_PROPOSAL
+    assert decision.executor == "self_development"
+
+
+def test_router_requires_approval_for_self_improve_apply_mode() -> None:
+    intent = WorkIntent(
+        goal="apply Hermes self improvement patch",
+        action_type="self_improve",
+        tool_candidate="self_improve",
+        params={"goal": "套用 Hermes 自我修改", "scope": "simple_agent", "mode": "apply_after_approval"},
+        read_only=False,
+        network=False,
+        writes_files=True,
+        requires_credentials=False,
+        approved=False,
+    )
+
+    decision = WorkSkillRouter(CommandTemplateRegistry.default()).route(intent)
+
+    assert decision.execution_mode == ExecutionMode.APPROVAL_REQUIRED
+    assert decision.policy_decision == PolicyDecision.APPROVAL_REQUIRED
+    assert decision.capability == CapabilityLevel.L4_APPROVED_WRITE
+
+
+def test_router_allows_gui_observe_as_read_only_gui_agent() -> None:
+    intent = WorkIntent(
+        goal="observe external chat UI",
+        action_type="gui",
+        tool_candidate="gui_observe",
+        params={},
+        read_only=True,
+        network=False,
+        writes_files=False,
+        requires_credentials=False,
+    )
+
+    decision = WorkSkillRouter(CommandTemplateRegistry.default()).route(intent)
+
+    assert decision.execution_mode == ExecutionMode.CLI_FAST
+    assert decision.policy_decision == PolicyDecision.ALLOW
+    assert decision.risk == "gui_observe"
+    assert decision.executor == "gui_agent"
+    assert decision.capability == CapabilityLevel.L1_READ_ONLY
+
+
+def test_router_requires_approval_for_gui_click_action() -> None:
+    intent = WorkIntent(
+        goal="click send button in external UI",
+        action_type="gui",
+        tool_candidate="gui_click",
+        params={"target": "send_button"},
+        read_only=False,
+        network=False,
+        writes_files=False,
+        requires_credentials=False,
+        reversible=True,
+        approved=False,
+    )
+
+    decision = WorkSkillRouter(CommandTemplateRegistry.default()).route(intent)
+
+    assert decision.execution_mode == ExecutionMode.APPROVAL_REQUIRED
+    assert decision.policy_decision == PolicyDecision.APPROVAL_REQUIRED
+    assert decision.risk == "gui_action"
+    assert decision.executor == "gui_agent"
+
+
+def test_router_denies_unknown_gui_tool() -> None:
+    intent = WorkIntent(
+        goal="drag something without a governed template",
+        action_type="gui",
+        tool_candidate="gui_drag",
+        params={"target": "message"},
+        read_only=False,
+        network=False,
+        writes_files=False,
+        requires_credentials=False,
+    )
+
+    decision = WorkSkillRouter(CommandTemplateRegistry.default()).route(intent)
+
+    assert decision.execution_mode == ExecutionMode.DENIED
+    assert decision.policy_decision == PolicyDecision.DENY
+    assert decision.risk == "gui_unknown"
+
+
 def test_execute_work_intent_runs_cli_template_and_records_raw_ref(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     trace_root = tmp_path / "trace"
@@ -218,3 +321,26 @@ def test_execute_work_intent_uses_mcp_governed_path_after_approval(tmp_path: Pat
     assert result.status == "completed"
     assert result.execution_mode == ExecutionMode.MCP_GOVERNED
     assert result.summary == "external ok"
+
+
+def test_execute_work_intent_records_gui_audit_trace(tmp_path: Path) -> None:
+    tools = ToolBox(str(tmp_path), ["python --version"])
+    intent = WorkIntent(
+        goal="observe desktop UI before acting",
+        action_type="gui",
+        tool_candidate="gui_observe",
+        params={},
+        read_only=True,
+        network=False,
+        writes_files=False,
+        requires_credentials=False,
+    )
+
+    result = execute_work_intent(intent, tools=tools, trace_root=tmp_path / "trace")
+
+    assert result.ok is True
+    assert result.status == "completed"
+    assert result.execution_mode == ExecutionMode.CLI_FAST
+    assert result.trace["audit"]["tool_name"] == "gui_observe"
+    assert result.trace["audit"]["input_payload_hash"]
+    assert result.trace["audit"]["executed"] is True

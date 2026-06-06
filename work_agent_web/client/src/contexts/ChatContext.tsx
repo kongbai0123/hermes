@@ -48,6 +48,11 @@ export function restoreChatState(serialized: string | null): AppState {
         ...chat,
         createdAt: reviveDate(chat.createdAt),
         updatedAt: reviveDate(chat.updatedAt),
+        settings: {
+          ...chat.settings,
+          reasoningLevel: chat.settings?.reasoningLevel ?? "medium",
+          responseSpeed: chat.settings?.responseSpeed ?? "standard",
+        },
         messages: (chat.messages || []).map((message) => ({
           ...message,
           createdAt: reviveDate(message.createdAt),

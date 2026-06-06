@@ -52,6 +52,67 @@ describe("chatReducer project item filing", () => {
     expect(nextState.projects[0].chatIds).toEqual([]);
     expect(nextState.projects[1].chatIds).toEqual(["chat-1"]);
   });
+
+  it("updates model controls and records the switch in the chat timeline", () => {
+    const state: AppState = {
+      ...baseState,
+      chats: [
+        {
+          id: "chat-1",
+          title: "Control test",
+          model: "ollama-gemma4",
+          provider: "ollama",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          messages: [],
+          settings: {
+            model: "ollama-gemma4",
+            provider: "ollama",
+            temperature: 0.2,
+            maxTokens: 2000,
+            systemPrompt: "",
+            reasoningLevel: "medium",
+            responseSpeed: "standard",
+          },
+          workbench: {
+            status: "idle",
+            plan: [],
+            toolLogs: [],
+            safetyRules: [],
+            workspaceEntries: [],
+            selectedFile: null,
+            patch: null,
+          },
+        },
+      ],
+    };
+
+    const updated = chatReducer(state, {
+      type: "UPDATE_CHAT_SETTINGS",
+      payload: {
+        chatId: "chat-1",
+        settings: {
+          reasoningLevel: "high",
+          responseSpeed: "fast",
+        },
+      },
+    });
+    const nextState = chatReducer(updated, {
+      type: "ADD_MESSAGE",
+      payload: {
+        id: "setting-message",
+        chatId: "chat-1",
+        role: "system",
+        content: "推理已切換至 高",
+        createdAt: new Date(),
+      },
+    });
+
+    expect(nextState.chats[0].settings.reasoningLevel).toBe("high");
+    expect(nextState.chats[0].settings.responseSpeed).toBe("fast");
+    expect(nextState.chats[0].messages[0].role).toBe("system");
+    expect(nextState.chats[0].messages[0].content).toBe("推理已切換至 高");
+  });
 });
 
 describe("restoreChatState", () => {
@@ -101,5 +162,7 @@ describe("restoreChatState", () => {
     expect(restored.projects[0].chatIds).toEqual(["chat-1"]);
     expect(restored.chats[0].createdAt).toBeInstanceOf(Date);
     expect(restored.chats[0].messages[0].createdAt).toBeInstanceOf(Date);
+    expect(restored.chats[0].settings.reasoningLevel).toBe("medium");
+    expect(restored.chats[0].settings.responseSpeed).toBe("standard");
   });
 });

@@ -2,6 +2,8 @@ export type Provider = "ollama" | "openai" | "work-agent" | string;
 export type MessageRole = "system" | "user" | "assistant";
 export type WorkbenchStatus = "idle" | "running" | "done" | "error";
 export type PlanStepStatus = "pending" | "running" | "done" | "error";
+export type ReasoningLevel = "low" | "medium" | "high" | "ultra";
+export type ResponseSpeed = "slow" | "standard" | "fast";
 
 export interface Model {
   id: string;
@@ -86,6 +88,8 @@ export interface ChatSettings {
   temperature: number;
   maxTokens: number;
   systemPrompt: string;
+  reasoningLevel: ReasoningLevel;
+  responseSpeed: ResponseSpeed;
 }
 
 export interface Message {

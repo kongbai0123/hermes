@@ -57,3 +57,15 @@ def test_manager_fallback_routes_multi_turn_gpt_web_work_to_external_chat_loop()
     assert decision.args["target"] == "chatgpt_web"
     assert decision.args["message"] == "HI"
     assert decision.args["max_turns"] == "3"
+
+
+def test_manager_fallback_routes_self_development_to_self_improve() -> None:
+    manager = ManagerModel(RefusalLLM())  # type: ignore[arg-type]
+
+    decision = manager.decide("請 Hermes 修改、優化、開發自己的程式能力")
+
+    assert decision.tool == "self_improve"
+    assert decision.worker == "self_development"
+    assert decision.args["mode"] == "proposal_only"
+    assert decision.args["scope"] == "simple_agent"
+    assert "Hermes" in decision.args["goal"]

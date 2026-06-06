@@ -69,8 +69,12 @@ class PolicyGate:
     NETWORK_TOOLS = {"proxy_fetch"}
     BROWSER_TOOLS = {"open_browser"}
     EXTERNAL_AGENT_TOOLS = {"external_codex", "external_chat", "external_chat_loop"}
+    GUI_OBSERVE_TOOLS = {"gui_observe", "gui_verify"}
+    GUI_ACTION_TOOLS = {"gui_click", "gui_type_text", "gui_hotkey", "gui_wait"}
 
     def evaluate(self, decision: ManagerDecision, capability: str) -> PolicyResult:
+        if decision.tool in self.GUI_OBSERVE_TOOLS or decision.tool in self.GUI_ACTION_TOOLS:
+            return self._evaluate_gui(decision, capability)
         intent = self._intent_from_decision(decision, capability)
         route = WorkSkillRouter(CommandTemplateRegistry.default()).route(intent)
         if route.policy_decision == WorkPolicyDecision.DENY:
@@ -157,9 +161,83 @@ class PolicyGate:
             return PolicyResult("browser", "allow", "Browser open action is allowed for configured allowlist domains.")
         if tool in self.EXTERNAL_AGENT_TOOLS:
             return PolicyResult("external_state", "allow", "External Codex agent handoff uses governed adapter path.")
+        if tool.startswith("gui_"):
+            return PolicyResult("gui_unknown", "deny", f"Unknown or unsupported GUI tool: {tool}")
         if tool in self.WRITE_TOOLS:
             return PolicyResult("medium", "approval_required", "Write or patch actions require approval.")
         return PolicyResult("high", "deny", f"Unknown or unsupported tool: {tool}")
+
+    def _evaluate_gui(self, decision: ManagerDecision, capability: str) -> PolicyResult:
+        route = WorkSkillRouter(CommandTemplateRegistry.default()).route(
+            self._intent_from_decision(decision, capability)
+        )
+        if capability == "plan_only":
+            return PolicyResult(
+                route.risk,
+                "deny",
+                "Plan-only capability cannot execute GUI tools.",
+                route.execution_mode.value,
+                route.executor,
+                route.template_id,
+                route.capability.value,
+                False,
+            )
+        if decision.tool == "gui_observe":
+            return PolicyResult(
+                route.risk,
+                "allow",
+                "Read-only GUI observation is allowed through the governed mock runner.",
+                route.execution_mode.value,
+                route.executor,
+                route.template_id,
+                route.capability.value,
+                False,
+            )
+        if decision.tool == "gui_verify":
+            if capability in {"controlled_autonomous", "approved_write", "full_dev", "external_governed"}:
+                return PolicyResult(
+                    route.risk,
+                    "allow",
+                    "GUI verification is allowed for controlled autonomous capability.",
+                    route.execution_mode.value,
+                    route.executor,
+                    route.template_id,
+                    route.capability.value,
+                    False,
+                )
+            return PolicyResult(
+                route.risk,
+                "approval_required",
+                "GUI verification requires controlled autonomous capability or approval.",
+                route.execution_mode.value,
+                route.executor,
+                route.template_id,
+                route.capability.value,
+                True,
+            )
+        if decision.tool in self.GUI_ACTION_TOOLS:
+            if capability in {"approved_write", "full_dev"}:
+                return PolicyResult(
+                    route.risk,
+                    "allow",
+                    "Approved write capability may execute registered GUI actions.",
+                    route.execution_mode.value,
+                    route.executor,
+                    route.template_id,
+                    route.capability.value,
+                    False,
+                )
+            return PolicyResult(
+                route.risk,
+                "approval_required",
+                "GUI actions can affect external UI state and require explicit approval.",
+                route.execution_mode.value,
+                route.executor,
+                route.template_id,
+                route.capability.value,
+                True,
+            )
+        return PolicyResult("gui_unknown", "deny", f"Unknown or unsupported GUI tool: {decision.tool}")
 
     def _intent_from_decision(self, decision: ManagerDecision, capability: str) -> WorkIntent:
         plan_text = f"{decision.plan} {decision.args}".lower()
@@ -169,7 +247,7 @@ class PolicyGate:
             action_type=self._action_type(tool),
             tool_candidate=tool,
             params=dict(decision.args),
-            read_only=tool in self.READ_ONLY_TOOLS or tool == "run_command",
+            read_only=tool in self.READ_ONLY_TOOLS or tool in self.GUI_OBSERVE_TOOLS or tool == "run_command",
             network=tool in self.NETWORK_TOOLS or tool in self.BROWSER_TOOLS or tool in self.EXTERNAL_AGENT_TOOLS,
             writes_files=tool in self.WRITE_TOOLS,
             requires_credentials=tool in self.EXTERNAL_AGENT_TOOLS,
@@ -179,6 +257,7 @@ class PolicyGate:
                 capability in {"approved_write", "full_dev", "external_governed"}
                 or tool in self.BROWSER_TOOLS
                 or (tool in self.EXTERNAL_AGENT_TOOLS and capability in {"controlled_autonomous", "external_governed"})
+                or (tool in self.GUI_ACTION_TOOLS and capability in {"approved_write", "full_dev"})
             ),
         )
 
@@ -189,6 +268,8 @@ class PolicyGate:
             return "local_verify"
         if tool in self.NETWORK_TOOLS or tool in self.BROWSER_TOOLS or tool in self.EXTERNAL_AGENT_TOOLS:
             return "external"
+        if tool in self.GUI_OBSERVE_TOOLS or tool in self.GUI_ACTION_TOOLS:
+            return "gui"
         if tool in self.WRITE_TOOLS:
             return "write"
         return "unknown"

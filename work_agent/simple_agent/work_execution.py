@@ -230,6 +230,8 @@ class CommandTemplateRegistry:
 
 
 class WorkSkillRouter:
+    GUI_OBSERVE_TOOLS = {"gui_observe", "gui_verify"}
+    GUI_ACTION_TOOLS = {"gui_click", "gui_type_text", "gui_hotkey", "gui_wait"}
     EXTERNAL_TOOLS = {
         "proxy_fetch",
         "open_browser",
@@ -255,6 +257,54 @@ class WorkSkillRouter:
                 True,
                 "planner",
                 CapabilityLevel.L0_PLAN_ONLY,
+                tool=intent.tool_candidate,
+            )
+        if intent.tool_candidate in self.GUI_OBSERVE_TOOLS:
+            return RouteDecision(
+                ExecutionMode.CLI_FAST,
+                "gui_observe",
+                PolicyDecision.ALLOW,
+                "GUI observation uses a governed mock runner and is read-only.",
+                False,
+                "gui_agent",
+                CapabilityLevel.L1_READ_ONLY,
+                tool=intent.tool_candidate,
+            )
+        if intent.tool_candidate in self.GUI_ACTION_TOOLS:
+            approved = intent.approved
+            return RouteDecision(
+                ExecutionMode.APPROVAL_REQUIRED,
+                "gui_action",
+                PolicyDecision.ALLOW if approved else PolicyDecision.APPROVAL_REQUIRED,
+                "GUI actions can affect external UI state and require explicit approval.",
+                not approved,
+                "gui_agent",
+                CapabilityLevel.L4_APPROVED_WRITE,
+                tool=intent.tool_candidate,
+            )
+        if intent.tool_candidate.startswith("gui_"):
+            return self._denied("gui_unknown", "Unknown GUI tool is denied until registered.")
+        if intent.tool_candidate == "self_improve":
+            mode = intent.params.get("mode", "proposal_only")
+            if mode == "proposal_only":
+                return RouteDecision(
+                    ExecutionMode.CLI_FAST,
+                    "medium",
+                    PolicyDecision.ALLOW,
+                    "Hermes self-improvement proposal can inspect code but must not write files.",
+                    False,
+                    "self_development",
+                    CapabilityLevel.L3_PATCH_PROPOSAL,
+                    tool=intent.tool_candidate,
+                )
+            return RouteDecision(
+                ExecutionMode.APPROVAL_REQUIRED,
+                "medium",
+                PolicyDecision.APPROVAL_REQUIRED if not intent.approved else PolicyDecision.ALLOW,
+                "Hermes self-modification requires explicit approval before applying changes.",
+                not intent.approved,
+                "self_development",
+                CapabilityLevel.L4_APPROVED_WRITE,
                 tool=intent.tool_candidate,
             )
         if intent.destructive:
@@ -370,6 +420,8 @@ class SafeCommandExecutor:
         self.tools = tools
 
     def execute(self, intent: WorkIntent, decision: RouteDecision) -> Observation:
+        if decision.executor in {"self_development", "gui_agent"}:
+            return self.tools.execute(intent.tool_candidate, **intent.params)
         if decision.template_id in {"read_file", "list_files", "search_text"}:
             return self.tools.execute(intent.tool_candidate, **intent.params)
         if intent.tool_candidate == "run_command":
@@ -433,6 +485,7 @@ def execute_work_intent(
     else:
         status = "failed"
 
+    audit = _build_audit_event(intent, decision, observation, status)
     trace = {
         "work_intent": asdict(intent),
         "routing": {
@@ -454,6 +507,7 @@ def execute_work_intent(
             "raw_ref": raw_ref,
             "truncated": truncated,
         },
+        "audit": audit,
     }
     return WorkExecutionResult(
         ok=observation.ok,
@@ -465,3 +519,27 @@ def execute_work_intent(
         next_recommendation="ask_user" if status == "approval_required" else "continue",
         trace=trace,
     )
+
+
+def _build_audit_event(
+    intent: WorkIntent,
+    decision: RouteDecision,
+    observation: Observation,
+    status: str,
+) -> dict[str, Any]:
+    payload = {
+        "goal": intent.goal,
+        "tool_candidate": intent.tool_candidate,
+        "params": intent.params,
+        "approved": intent.approved,
+    }
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+    return {
+        "tool_name": intent.tool_candidate,
+        "executor": decision.executor,
+        "risk_level": decision.risk,
+        "policy_decision": decision.policy_decision.value,
+        "status": status,
+        "executed": observation.ok and not decision.requires_approval,
+        "input_payload_hash": digest,
+    }

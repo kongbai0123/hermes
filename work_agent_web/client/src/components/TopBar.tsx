@@ -2,7 +2,7 @@ import { useChat } from "@/contexts/ChatContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
-import { Languages, MessageSquare, PanelRight, Settings, Moon, Sun, ChevronDown } from "lucide-react";
+import { Languages, MessageSquare, PanelRight, Settings, Moon, Sun } from "lucide-react";
 import { createDefaultChat } from "@/lib/workAgent";
 import {
   DropdownMenu,
@@ -21,7 +21,6 @@ export default function TopBar({ agentFlowOpen, onToggleAgentFlow }: TopBarProps
   const { theme, toggleTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
   const currentChat = state.chats.find((c) => c.id === state.currentChatId);
-  const currentModel = state.models.find((m) => m.id === currentChat?.model);
 
   const handleThemeToggle = () => {
     const newTheme = theme === "light" ? "dark" : "light";
@@ -48,42 +47,8 @@ export default function TopBar({ agentFlowOpen, onToggleAgentFlow }: TopBarProps
       </div>
 
       <div className="flex-1 flex justify-center">
-        {currentChat && currentModel ? (
+        {currentChat ? (
           <div className="flex items-center gap-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2 max-w-xs truncate">
-                  <span className="text-sm truncate">{currentModel.name}</span>
-                  <ChevronDown className="w-4 h-4 flex-shrink-0" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="center" className="w-56">
-                {state.models.map((model) => (
-                  <DropdownMenuItem
-                    key={model.id}
-                    onClick={() => {
-                      dispatch({
-                        type: "UPDATE_CHAT_SETTINGS",
-                        payload: {
-                          chatId: currentChat.id,
-                          settings: {
-                            model: model.id,
-                            provider: model.provider,
-                          },
-                        },
-                      });
-                    }}
-                    className={model.id === currentChat.model ? "bg-primary/10" : ""}
-                  >
-                    <div className="flex flex-col gap-1">
-                      <span className="font-medium">{model.name}</span>
-                      <span className="text-xs text-muted-foreground">{model.provider}</span>
-                    </div>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
             <div className="hidden md:flex items-center gap-2 text-xs">
               <span className="rounded-full border border-border px-2 py-1 text-muted-foreground">
                 {currentChat.workbench.safetyModeLabel ? t("top.safeMode") : t("top.safeMode")}

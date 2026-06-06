@@ -74,6 +74,8 @@ export function createDefaultChat(models: Model[]): Chat {
       provider: activeModel.provider,
       temperature: 0.2,
       maxTokens: 2000,
+      reasoningLevel: "medium",
+      responseSpeed: "standard",
       systemPrompt:
         "You are Work Agent. Focus on safe file analysis, tool observations, and concise execution guidance.",
     },
