@@ -356,3 +356,94 @@ def test_bounded_loop_requires_approval_for_gui_click_in_controlled_autonomous(t
     assert result["stop_reason"] == "NEEDS_USER_APPROVAL"
     assert result["trace"][0]["policy"]["risk"] == "gui_action"
     assert result["trace"][0]["policy"]["decision"] == "approval_required"
+
+
+def test_bounded_loop_requires_approval_for_gui_type_text_without_user_approval(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    controller = make_controller(
+        workspace,
+        [ManagerDecision("在外部 UI 輸入文字。", "gui", "gui_type_text", {"target": "active_window", "text": "HI"})],
+        default_capability="controlled_autonomous",
+    )
+
+    result = controller.run("請 Hermes 在 antigravity 上打 HI")
+
+    assert result["stop_reason"] == "NEEDS_USER_APPROVAL"
+    assert result["observation"]["ok"] is False
+    assert result["trace"][0]["policy"]["decision"] == "approval_required"
+
+
+def test_bounded_loop_allows_gui_type_text_when_user_explicitly_approves(tmp_path: Path) -> None:
+    class RecordingRunner:
+        def __init__(self) -> None:
+            self.typed: list[tuple[str, str]] = []
+
+        def observe(self) -> str:
+            return "{}"
+
+        def verify(self, condition: str) -> str:
+            return "{}"
+
+        def click(self, target: str) -> str:
+            return "{}"
+
+        def type_text(self, target: str, text: str) -> str:
+            self.typed.append((target, text))
+            return '{"status":"typed","runner":"recording","target":"active_window","text_length":2}'
+
+        def hotkey(self, keys: str) -> str:
+            return "{}"
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    runner = RecordingRunner()
+    tools = ToolBox(str(workspace), ["python --version"], gui_runner=runner)
+    controller = make_controller(
+        workspace,
+        [ManagerDecision("在外部 UI 輸入文字。", "gui", "gui_type_text", {"target": "active_window", "text": "HI"})],
+        tools=tools,
+        default_capability="controlled_autonomous",
+    )
+
+    result = controller.run("我批准 Hermes 在 antigravity 上打 HI")
+
+    assert result["stop_reason"] == "DONE"
+    assert result["observation"]["ok"] is True
+    assert result["trace"][0]["policy"]["decision"] == "allow"
+    assert result["trace"][0]["policy"]["requires_approval"] is False
+    assert runner.typed == [("active_window", "HI")]
+
+
+def test_bounded_loop_allows_app_launch_when_user_explicitly_approves(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    desktop = tmp_path / "Desktop"
+    workspace.mkdir()
+    desktop.mkdir()
+    shortcut = desktop / "原神.lnk"
+    shortcut.write_text("shortcut", encoding="utf-8")
+    launched: list[Path] = []
+
+    def fake_launcher(path: Path) -> dict[str, str]:
+        launched.append(path)
+        return {"status": "launched", "target": "launcher.exe"}
+
+    tools = ToolBox(
+        str(workspace),
+        ["python --version"],
+        desktop_paths=[desktop],
+        app_launcher=fake_launcher,
+    )
+    controller = make_controller(
+        workspace,
+        [ManagerDecision("啟動桌面上的原神捷徑。", "gui", "app_launch", {"shortcut": "原神"})],
+        tools=tools,
+        default_capability="controlled_autonomous",
+    )
+
+    result = controller.run("我批准 Hermes 啟動桌面上原神")
+
+    assert result["stop_reason"] == "DONE"
+    assert result["observation"]["ok"] is True
+    assert result["trace"][0]["policy"]["decision"] == "allow"
+    assert launched == [shortcut]

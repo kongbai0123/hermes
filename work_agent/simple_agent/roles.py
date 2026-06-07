@@ -21,15 +21,19 @@ class ManagerModel:
         self.llm = llm
 
     def decide(self, user_text: str) -> ManagerDecision:
+        deterministic = self._deterministic_decision(user_text)
+        if deterministic is not None:
+            return deterministic
+
         prompt = (
             "你是 Manager Model。請把使用者任務轉成簡單決策。\n"
             "只能輸出 JSON，不要 markdown。\n"
-            "JSON 格式：{\"plan\":\"...\",\"worker\":\"file|search|test|external|self_development|explain\","
-            "\"tool\":\"list_files|read_file|search_text|run_command|proxy_fetch|open_browser|external_codex|external_chat|external_chat_loop|self_improve|none\","
+            "JSON 格式：{\"plan\":\"...\",\"worker\":\"file|search|test|external|self_development|gui|explain\","
+            "\"tool\":\"list_files|read_file|search_text|run_command|proxy_fetch|open_browser|external_codex|external_chat|external_chat_loop|self_improve|gui_observe|gui_verify|gui_click|gui_type_text|gui_hotkey|app_launch|none\","
             "\"args\":{\"path\":\"...\",\"keyword\":\"...\",\"command\":\"...\",\"url\":\"...\","
             "\"browser\":\"chrome\",\"topic\":\"...\",\"mode\":\"self_optimization_discussion\","
             "\"message\":\"...\",\"target\":\"chatgpt_web\",\"max_turns\":\"3\","
-            "\"goal\":\"...\",\"scope\":\"simple_agent\"}}\n"
+            "\"goal\":\"...\",\"scope\":\"simple_agent\",\"condition\":\"chat_prompt_visible\",\"target\":\"send_button\",\"text\":\"HI\",\"keys\":\"Ctrl+L\",\"shortcut\":\"原神\"}}\n"
             "若使用者要看結構，用 list_files。若要讀檔，用 read_file。"
             "若要找關鍵字，用 search_text。若要跑測試或版本，用 run_command。"
             "若使用者明確要求網路 proxy 或抓取外部 URL，用 proxy_fetch，args 必須包含 url。"
@@ -44,6 +48,12 @@ class ManagerModel:
             "用 external_chat_loop，args 必須包含 message、target=chatgpt_web 與 max_turns。"
             "若使用者要求 Hermes 修改、優化、開發自己的程式，"
             "用 self_improve，args 必須包含 goal、scope=simple_agent 與 mode=proposal_only。"
+            "若使用者只要求觀察、讀取、查看外部桌面或外部 GPT 畫面，用 gui_observe，不要用 open_browser。"
+            "若使用者要求驗證外部 UI 條件，用 gui_verify，args 必須包含 condition。"
+            "若使用者要求點擊外部 UI 元素，用 gui_click，args 必須包含 target。"
+            "若使用者要求在外部桌面應用輸入文字，用 gui_type_text，args 必須包含 target 與 text。"
+            "若使用者要求對外部桌面應用送出快捷鍵，用 gui_hotkey，args 必須包含 keys。"
+            "若使用者要求啟動桌面應用或遊戲捷徑，用 app_launch，args 必須包含 shortcut。"
         )
         try:
             raw = self.llm.chat(
@@ -58,6 +68,61 @@ class ManagerModel:
             )
         except Exception:
             return self._fallback_decision(user_text)
+
+    def _deterministic_decision(self, user_text: str) -> ManagerDecision | None:
+        text = user_text.lower()
+        is_external_ui = any(
+            word in text for word in ["外部", "gpt", "chatgpt", "網頁版", "桌面", "畫面", "ui", "antigravity"]
+        )
+        if not is_external_ui:
+            return None
+        if any(word in text for word in ["快捷鍵", "hotkey"]):
+            return ManagerDecision(
+                "對外部 UI 傳送快捷鍵，需交由 PolicyGate 判斷 approval boundary。",
+                "gui",
+                "gui_hotkey",
+                {"keys": self._extract_gui_hotkey(user_text)},
+            )
+        if any(word in text for word in ["啟動", "開啟", "打開", "launch"]) and any(
+            word in text for word in ["原神", "genshin"]
+        ):
+            return ManagerDecision(
+                "啟動桌面上的原神捷徑，需交由 PolicyGate 判斷 approval boundary。",
+                "gui",
+                "app_launch",
+                {"shortcut": "原神"},
+            )
+        if any(word in text for word in ["輸入", "打字", "打 ", "type", "填入", "寫入"]):
+            return ManagerDecision(
+                "在外部 UI 輸入文字，需交由 PolicyGate 判斷 approval boundary。",
+                "gui",
+                "gui_type_text",
+                {"target": self._extract_gui_text_target(user_text), "text": self._extract_gui_text(user_text)},
+            )
+        if any(word in text for word in ["點擊", "按下", "click"]):
+            return ManagerDecision(
+                "點擊外部 UI 元素，需交由 PolicyGate 判斷 approval boundary。",
+                "gui",
+                "gui_click",
+                {"target": self._extract_gui_target(user_text)},
+            )
+        if any(word in text for word in ["下達", "送出", "傳送", "來回", "多輪", "聊天"]):
+            return None
+        if any(word in text for word in ["驗證", "verify", "確認條件"]):
+            return ManagerDecision(
+                "透過 GUI mock runner 驗證外部 UI 條件。",
+                "gui",
+                "gui_verify",
+                {"condition": self._extract_gui_condition(user_text)},
+            )
+        if any(word in text for word in ["觀察", "查看", "讀取畫面", "可見", "畫面", "ui"]):
+            return ManagerDecision(
+                "透過 GUI mock runner 觀察外部 UI 狀態。",
+                "gui",
+                "gui_observe",
+                {},
+            )
+        return None
 
     def _extract_json(self, raw: str) -> dict:
         match = re.search(r"\{.*\}", raw, flags=re.S)
@@ -174,6 +239,61 @@ class ManagerModel:
         if not match:
             return 3
         return max(1, min(int(match.group(1)), 8))
+
+    def _extract_gui_condition(self, user_text: str) -> str:
+        condition_match = re.search(r"\b([a-z][a-z0-9]*_[a-z0-9_]{2,80})\b", user_text, flags=re.I)
+        if condition_match:
+            return condition_match.group(1)
+        match = re.search(r"\b([a-z][a-z0-9_]{2,80})\b", user_text, flags=re.I)
+        if match:
+            return match.group(1)
+        if any(word in user_text.lower() for word in ["prompt", "輸入框", "聊天欄"]):
+            return "chat_prompt_visible"
+        if any(word in user_text.lower() for word in ["send", "送出"]):
+            return "send_button_visible"
+        return "chat_prompt_visible"
+
+    def _extract_gui_target(self, user_text: str) -> str:
+        text = user_text.lower()
+        target_match = re.search(r"\b([a-z][a-z0-9]*_[a-z0-9_]{2,80})\b", user_text, flags=re.I)
+        if target_match:
+            return target_match.group(1)
+        if any(word in text for word in ["send", "送出"]):
+            return "send_button"
+        if any(word in text for word in ["prompt", "輸入框", "聊天欄"]):
+            return "chat_prompt"
+        return "unknown_target"
+
+    def _extract_gui_text_target(self, user_text: str) -> str:
+        text = user_text.lower()
+        if "antigravity" in text:
+            return "window:antigravity"
+        if any(word in text for word in ["prompt", "輸入框", "聊天欄"]):
+            return "chat_prompt"
+        return "active_window"
+
+    def _extract_gui_text(self, user_text: str) -> str:
+        quote_match = re.search(r"[「『\"]([^」』\"]+)[」』\"]", user_text)
+        if quote_match:
+            return quote_match.group(1).strip()
+        patterns = [
+            r"(?:打字|輸入|填入|寫入|type)\s*([A-Za-z0-9 _-]{1,120})",
+            r"打\s+([A-Za-z0-9 _-]{1,120})",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, user_text, flags=re.I)
+            if match:
+                return match.group(1).strip(" ：:，,。")
+        upper_match = re.search(r"\b(?!HERMES\b|ANTIGRAVITY\b)([A-Z][A-Z0-9 _-]{0,80})\b", user_text, flags=re.I)
+        if upper_match:
+            return upper_match.group(1).strip()
+        return ""
+
+    def _extract_gui_hotkey(self, user_text: str) -> str:
+        match = re.search(r"\b((?:Ctrl|Control|Alt|Shift)\s*[+＋]\s*[A-Za-z0-9]+)\b", user_text, flags=re.I)
+        if match:
+            return match.group(1).replace("＋", "+").replace(" ", "")
+        return "Ctrl+L"
 
 
 class WorkerModel:

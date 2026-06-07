@@ -232,6 +232,7 @@ class CommandTemplateRegistry:
 class WorkSkillRouter:
     GUI_OBSERVE_TOOLS = {"gui_observe", "gui_verify"}
     GUI_ACTION_TOOLS = {"gui_click", "gui_type_text", "gui_hotkey", "gui_wait"}
+    APP_LAUNCH_TOOLS = {"app_launch"}
     EXTERNAL_TOOLS = {
         "proxy_fetch",
         "open_browser",
@@ -264,7 +265,7 @@ class WorkSkillRouter:
                 ExecutionMode.CLI_FAST,
                 "gui_observe",
                 PolicyDecision.ALLOW,
-                "GUI observation uses a governed mock runner and is read-only.",
+                "GUI observation uses a governed GUI runner and is read-only.",
                 False,
                 "gui_agent",
                 CapabilityLevel.L1_READ_ONLY,
@@ -284,6 +285,18 @@ class WorkSkillRouter:
             )
         if intent.tool_candidate.startswith("gui_"):
             return self._denied("gui_unknown", "Unknown GUI tool is denied until registered.")
+        if intent.tool_candidate in self.APP_LAUNCH_TOOLS:
+            approved = intent.approved
+            return RouteDecision(
+                ExecutionMode.APPROVAL_REQUIRED,
+                "external_state",
+                PolicyDecision.ALLOW if approved else PolicyDecision.APPROVAL_REQUIRED,
+                "Launching a desktop application changes external UI state and requires approval.",
+                not approved,
+                "app_launcher",
+                CapabilityLevel.L4_APPROVED_WRITE,
+                tool=intent.tool_candidate,
+            )
         if intent.tool_candidate == "self_improve":
             mode = intent.params.get("mode", "proposal_only")
             if mode == "proposal_only":
@@ -420,7 +433,7 @@ class SafeCommandExecutor:
         self.tools = tools
 
     def execute(self, intent: WorkIntent, decision: RouteDecision) -> Observation:
-        if decision.executor in {"self_development", "gui_agent"}:
+        if decision.executor in {"self_development", "gui_agent", "app_launcher"}:
             return self.tools.execute(intent.tool_candidate, **intent.params)
         if decision.template_id in {"read_file", "list_files", "search_text"}:
             return self.tools.execute(intent.tool_candidate, **intent.params)
@@ -471,7 +484,10 @@ def execute_work_intent(
     elif decision.execution_mode == ExecutionMode.MCP_GOVERNED:
         observation = McpGovernedAdapter(tools).execute(intent, decision)
     elif decision.execution_mode == ExecutionMode.APPROVAL_REQUIRED:
-        observation = Observation(False, intent.tool_candidate, decision.reason)
+        if decision.policy_decision == PolicyDecision.ALLOW and decision.executor in {"gui_agent", "app_launcher"}:
+            observation = SafeCommandExecutor(tools).execute(intent, decision)
+        else:
+            observation = Observation(False, intent.tool_candidate, decision.reason)
     else:
         observation = Observation(False, intent.tool_candidate, "Plan only; no execution performed.")
 

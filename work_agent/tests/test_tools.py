@@ -246,3 +246,80 @@ def test_gui_observe_reports_unavailable_runner(tmp_path: Path) -> None:
     assert result.ok is False
     assert result.tool == "gui_observe"
     assert "tool_unavailable" in result.content
+
+
+def test_gui_action_tools_call_runner_when_policy_allows_execution(tmp_path: Path) -> None:
+    class RecordingRunner:
+        def __init__(self) -> None:
+            self.actions: list[tuple[str, tuple[str, ...]]] = []
+
+        def observe(self) -> str:
+            return "{}"
+
+        def verify(self, condition: str) -> str:
+            return "{}"
+
+        def click(self, target: str) -> str:
+            self.actions.append(("click", (target,)))
+            return json.dumps({"status": "clicked", "target": target})
+
+        def type_text(self, target: str, text: str) -> str:
+            self.actions.append(("type_text", (target, text)))
+            return json.dumps({"status": "typed", "target": target, "text_length": len(text)})
+
+        def hotkey(self, keys: str) -> str:
+            self.actions.append(("hotkey", (keys,)))
+            return json.dumps({"status": "hotkey_sent", "keys": keys.split("+")})
+
+    runner = RecordingRunner()
+    tools = ToolBox(str(tmp_path), ["python --version"], gui_runner=runner)
+
+    click_result = tools.execute("gui_click", target="send_button")
+    type_result = tools.execute("gui_type_text", target="chat_prompt", text="HI")
+    hotkey_result = tools.execute("gui_hotkey", keys="Ctrl+L")
+
+    assert click_result.ok is True
+    assert type_result.ok is True
+    assert hotkey_result.ok is True
+    assert runner.actions == [
+        ("click", ("send_button",)),
+        ("type_text", ("chat_prompt", "HI")),
+        ("hotkey", ("Ctrl+L",)),
+    ]
+
+
+def test_app_launch_uses_registered_desktop_shortcut_launcher(tmp_path: Path) -> None:
+    desktop = tmp_path / "Desktop"
+    desktop.mkdir()
+    shortcut = desktop / "原神.lnk"
+    shortcut.write_text("shortcut", encoding="utf-8")
+    launched: list[Path] = []
+
+    def fake_launcher(path: Path) -> dict[str, str]:
+        launched.append(path)
+        return {"status": "launched", "target": "C:/Program Files/HoYoPlay/launcher.exe"}
+
+    tools = ToolBox(
+        str(tmp_path),
+        ["python --version"],
+        desktop_paths=[desktop],
+        app_launcher=fake_launcher,
+    )
+
+    result = tools.app_launch("原神")
+    payload = json.loads(result.content)
+
+    assert result.ok is True
+    assert result.tool == "app_launch"
+    assert launched == [shortcut]
+    assert payload["status"] == "launched"
+    assert payload["shortcut"] == shortcut.as_posix()
+
+
+def test_app_launch_rejects_path_like_shortcut_names(tmp_path: Path) -> None:
+    tools = ToolBox(str(tmp_path), ["python --version"])
+
+    result = tools.app_launch("../原神")
+
+    assert result.ok is False
+    assert "捷徑名稱" in result.content

@@ -71,8 +71,11 @@ class PolicyGate:
     EXTERNAL_AGENT_TOOLS = {"external_codex", "external_chat", "external_chat_loop"}
     GUI_OBSERVE_TOOLS = {"gui_observe", "gui_verify"}
     GUI_ACTION_TOOLS = {"gui_click", "gui_type_text", "gui_hotkey", "gui_wait"}
+    APP_LAUNCH_TOOLS = {"app_launch"}
 
     def evaluate(self, decision: ManagerDecision, capability: str) -> PolicyResult:
+        if decision.tool in self.APP_LAUNCH_TOOLS:
+            return self._evaluate_app_launch(decision, capability)
         if decision.tool in self.GUI_OBSERVE_TOOLS or decision.tool in self.GUI_ACTION_TOOLS:
             return self._evaluate_gui(decision, capability)
         intent = self._intent_from_decision(decision, capability)
@@ -167,6 +170,32 @@ class PolicyGate:
             return PolicyResult("medium", "approval_required", "Write or patch actions require approval.")
         return PolicyResult("high", "deny", f"Unknown or unsupported tool: {tool}")
 
+    def _evaluate_app_launch(self, decision: ManagerDecision, capability: str) -> PolicyResult:
+        route = WorkSkillRouter(CommandTemplateRegistry.default()).route(
+            self._intent_from_decision(decision, capability)
+        )
+        if capability in {"approved_write", "full_dev", "gui_approved"}:
+            return PolicyResult(
+                route.risk,
+                "allow",
+                route.reason,
+                route.execution_mode.value,
+                route.executor,
+                route.template_id,
+                route.capability.value,
+                False,
+            )
+        return PolicyResult(
+            route.risk,
+            "approval_required",
+            route.reason,
+            route.execution_mode.value,
+            route.executor,
+            route.template_id,
+            route.capability.value,
+            True,
+        )
+
     def _evaluate_gui(self, decision: ManagerDecision, capability: str) -> PolicyResult:
         route = WorkSkillRouter(CommandTemplateRegistry.default()).route(
             self._intent_from_decision(decision, capability)
@@ -186,7 +215,7 @@ class PolicyGate:
             return PolicyResult(
                 route.risk,
                 "allow",
-                "Read-only GUI observation is allowed through the governed mock runner.",
+                "Read-only GUI observation is allowed through the governed GUI runner.",
                 route.execution_mode.value,
                 route.executor,
                 route.template_id,
@@ -194,7 +223,7 @@ class PolicyGate:
                 False,
             )
         if decision.tool == "gui_verify":
-            if capability in {"controlled_autonomous", "approved_write", "full_dev", "external_governed"}:
+            if capability in {"controlled_autonomous", "approved_write", "full_dev", "external_governed", "gui_approved"}:
                 return PolicyResult(
                     route.risk,
                     "allow",
@@ -216,7 +245,7 @@ class PolicyGate:
                 True,
             )
         if decision.tool in self.GUI_ACTION_TOOLS:
-            if capability in {"approved_write", "full_dev"}:
+            if capability in {"approved_write", "full_dev", "gui_approved"}:
                 return PolicyResult(
                     route.risk,
                     "allow",
@@ -257,7 +286,8 @@ class PolicyGate:
                 capability in {"approved_write", "full_dev", "external_governed"}
                 or tool in self.BROWSER_TOOLS
                 or (tool in self.EXTERNAL_AGENT_TOOLS and capability in {"controlled_autonomous", "external_governed"})
-                or (tool in self.GUI_ACTION_TOOLS and capability in {"approved_write", "full_dev"})
+                or (tool in self.GUI_ACTION_TOOLS and capability in {"approved_write", "full_dev", "gui_approved"})
+                or (tool in self.APP_LAUNCH_TOOLS and capability in {"approved_write", "full_dev", "gui_approved"})
             ),
         )
 
@@ -270,6 +300,8 @@ class PolicyGate:
             return "external"
         if tool in self.GUI_OBSERVE_TOOLS or tool in self.GUI_ACTION_TOOLS:
             return "gui"
+        if tool in self.APP_LAUNCH_TOOLS:
+            return "app_launch"
         if tool in self.WRITE_TOOLS:
             return "write"
         return "unknown"
@@ -344,6 +376,7 @@ class BoundedLoopController:
     def run(self, user_text: str) -> dict:
         trace_id = f"trace_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
         task_id = f"task_{abs(hash(user_text)) % 1000000:06d}"
+        effective_capability = self._capability_for_user_text(user_text)
         trace: list[dict] = []
         replan_count = 0
         tool_failures = 0
@@ -365,7 +398,7 @@ class BoundedLoopController:
                 same_action_repeat = 0
             previous_action = action_key
 
-            policy = self.policy_gate.evaluate(decision, self.limits.default_capability)
+            policy = self.policy_gate.evaluate(decision, effective_capability)
             if policy.execution_mode == "PLAN_ONLY":
                 observation = Observation(
                     True,
@@ -473,6 +506,16 @@ class BoundedLoopController:
                 "tool_failures": tool_failures,
             },
         }
+
+    def _capability_for_user_text(self, user_text: str) -> str:
+        if self._has_explicit_approval(user_text):
+            return "gui_approved"
+        return self.limits.default_capability
+
+    def _has_explicit_approval(self, user_text: str) -> bool:
+        text = user_text.lower()
+        approval_markers = ["批准", "允許", "授權", "同意", "approve", "approved", "allow"]
+        return any(marker in text for marker in approval_markers)
 
     def _trace_entry(
         self,

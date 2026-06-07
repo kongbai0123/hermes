@@ -7,6 +7,14 @@ class RefusalLLM:
         return "我無法直接操作您電腦桌面上安裝的軟體或執行本地系統指令。"
 
 
+class BrowserFirstLLM:
+    def chat(self, _messages):
+        return (
+            '{"plan":"Observation of external web page UI","worker":"external",'
+            '"tool":"open_browser","args":{"url":"https://chat.openai.com/","browser":"chrome"}}'
+        )
+
+
 def test_worker_uses_observation_instead_of_generic_local_refusal() -> None:
     worker = WorkerModel(RefusalLLM())  # type: ignore[arg-type]
     decision = ManagerDecision(
@@ -69,3 +77,53 @@ def test_manager_fallback_routes_self_development_to_self_improve() -> None:
     assert decision.args["mode"] == "proposal_only"
     assert decision.args["scope"] == "simple_agent"
     assert "Hermes" in decision.args["goal"]
+
+
+def test_manager_routes_external_ui_observation_to_gui_observe_before_llm() -> None:
+    manager = ManagerModel(BrowserFirstLLM())  # type: ignore[arg-type]
+
+    decision = manager.decide("請 Hermes 觀察外部 GPT 畫面並回報可見 UI")
+
+    assert decision.tool == "gui_observe"
+    assert decision.worker == "gui"
+
+
+def test_manager_routes_external_ui_verification_to_gui_verify_before_llm() -> None:
+    manager = ManagerModel(BrowserFirstLLM())  # type: ignore[arg-type]
+
+    decision = manager.decide("請 Hermes 驗證外部 GPT 的 chat_prompt_visible")
+
+    assert decision.tool == "gui_verify"
+    assert decision.worker == "gui"
+    assert decision.args["condition"] == "chat_prompt_visible"
+
+
+def test_manager_routes_external_ui_click_to_gui_click_before_llm() -> None:
+    manager = ManagerModel(BrowserFirstLLM())  # type: ignore[arg-type]
+
+    decision = manager.decide("請 Hermes 點擊外部 GPT 送出按鈕")
+
+    assert decision.tool == "gui_click"
+    assert decision.worker == "gui"
+    assert decision.args["target"] == "send_button"
+
+
+def test_manager_routes_antigravity_text_input_to_gui_type_text_before_llm() -> None:
+    manager = ManagerModel(BrowserFirstLLM())  # type: ignore[arg-type]
+
+    decision = manager.decide("請 Hermes 在 antigravity 上打 HI")
+
+    assert decision.tool == "gui_type_text"
+    assert decision.worker == "gui"
+    assert decision.args["target"] == "window:antigravity"
+    assert decision.args["text"] == "HI"
+
+
+def test_manager_routes_genshin_launch_to_app_launch_before_llm() -> None:
+    manager = ManagerModel(BrowserFirstLLM())  # type: ignore[arg-type]
+
+    decision = manager.decide("請 Hermes 啟動桌面上原神")
+
+    assert decision.tool == "app_launch"
+    assert decision.worker == "gui"
+    assert decision.args["shortcut"] == "原神"

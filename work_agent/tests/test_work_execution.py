@@ -344,3 +344,62 @@ def test_execute_work_intent_records_gui_audit_trace(tmp_path: Path) -> None:
     assert result.trace["audit"]["tool_name"] == "gui_observe"
     assert result.trace["audit"]["input_payload_hash"]
     assert result.trace["audit"]["executed"] is True
+
+
+def test_execute_work_intent_runs_approved_gui_action_and_records_audit(tmp_path: Path) -> None:
+    class ClickRunner:
+        def __init__(self) -> None:
+            self.clicked: list[str] = []
+
+        def observe(self) -> str:
+            return "{}"
+
+        def verify(self, condition: str) -> str:
+            return "{}"
+
+        def click(self, target: str) -> str:
+            self.clicked.append(target)
+            return '{"status":"clicked","target":"send_button"}'
+
+    runner = ClickRunner()
+    tools = ToolBox(str(tmp_path), ["python --version"], gui_runner=runner)
+    intent = WorkIntent(
+        goal="click external send button after approval",
+        action_type="gui",
+        tool_candidate="gui_click",
+        params={"target": "send_button"},
+        read_only=False,
+        network=False,
+        writes_files=False,
+        requires_credentials=False,
+        approved=True,
+    )
+
+    result = execute_work_intent(intent, tools=tools, trace_root=tmp_path / "trace")
+
+    assert result.ok is True
+    assert result.status == "completed"
+    assert runner.clicked == ["send_button"]
+    assert result.trace["audit"]["tool_name"] == "gui_click"
+    assert result.trace["audit"]["executed"] is True
+
+
+def test_router_requires_approval_for_app_launch() -> None:
+    intent = WorkIntent(
+        goal="launch Genshin from desktop shortcut",
+        action_type="app_launch",
+        tool_candidate="app_launch",
+        params={"shortcut": "原神"},
+        read_only=False,
+        network=False,
+        writes_files=False,
+        requires_credentials=False,
+        approved=False,
+    )
+
+    decision = WorkSkillRouter(CommandTemplateRegistry.default()).route(intent)
+
+    assert decision.execution_mode == ExecutionMode.APPROVAL_REQUIRED
+    assert decision.policy_decision == PolicyDecision.APPROVAL_REQUIRED
+    assert decision.risk == "external_state"
+    assert decision.executor == "app_launcher"

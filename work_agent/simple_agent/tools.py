@@ -42,6 +42,8 @@ class ToolBox:
         external_codex_runner: Callable[[str, str], str] | None = None,
         external_chat_bridge: ExternalChatBridge | None = None,
         gui_runner: GuiRunner | None = None,
+        desktop_paths: list[Path] | None = None,
+        app_launcher: Callable[[Path], dict[str, str]] | None = None,
     ) -> None:
         self.workspace = Path(workspace_path).resolve()
         self.allowed_commands = allowed_commands
@@ -52,6 +54,8 @@ class ToolBox:
         self.external_codex_runner = external_codex_runner
         self.external_chat_bridge = external_chat_bridge or UnconfiguredExternalChatBridge()
         self.gui_runner = gui_runner or MockGuiRunner()
+        self.desktop_paths = desktop_paths or self._default_desktop_paths()
+        self.app_launcher = app_launcher or self._default_app_launcher
         self.workspace.mkdir(parents=True, exist_ok=True)
 
     def _safe_path(self, path: str) -> Path:
@@ -345,14 +349,53 @@ class ToolBox:
             return Observation(False, "gui_verify", json.dumps(payload, ensure_ascii=False))
 
     def gui_action_placeholder(self, tool_name: str, **kwargs: str) -> Observation:
-        payload = {
-            "ok": False,
-            "status": "approval_required",
-            "tool": tool_name,
-            "args": dict(kwargs),
-            "reason": "GUI action tools require explicit approval and a real governed runner before execution.",
-        }
-        return Observation(False, tool_name, json.dumps(payload, ensure_ascii=False))
+        try:
+            if tool_name == "gui_click":
+                return Observation(True, tool_name, self.gui_runner.click(kwargs.get("target", ""))[:8000])
+            if tool_name == "gui_type_text":
+                return Observation(
+                    True,
+                    tool_name,
+                    self.gui_runner.type_text(kwargs.get("target", ""), kwargs.get("text", ""))[:8000],
+                )
+            if tool_name == "gui_hotkey":
+                return Observation(True, tool_name, self.gui_runner.hotkey(kwargs.get("keys", ""))[:8000])
+            payload = {
+                "ok": False,
+                "status": "unsupported",
+                "tool": tool_name,
+                "args": dict(kwargs),
+            }
+            return Observation(False, tool_name, json.dumps(payload, ensure_ascii=False))
+        except Exception as exc:
+            payload = {
+                "ok": False,
+                "status": "tool_unavailable",
+                "tool": tool_name,
+                "args": dict(kwargs),
+                "reason": str(exc),
+            }
+            return Observation(False, tool_name, json.dumps(payload, ensure_ascii=False))
+
+    def app_launch(self, shortcut: str) -> Observation:
+        safe_shortcut = (shortcut or "").strip()
+        if not safe_shortcut:
+            return Observation(False, "app_launch", "app_launch 需要桌面捷徑名稱。")
+        if any(separator in safe_shortcut for separator in ["/", "\\", ":"]) or ".." in safe_shortcut:
+            return Observation(False, "app_launch", "app_launch 只接受桌面捷徑名稱，不接受路徑。")
+        if not safe_shortcut.lower().endswith(".lnk"):
+            safe_shortcut = f"{safe_shortcut}.lnk"
+        try:
+            shortcut_path = self._find_desktop_shortcut(safe_shortcut)
+            launch_result = self.app_launcher(shortcut_path)
+            payload = {
+                "status": launch_result.get("status", "launched"),
+                "shortcut": shortcut_path.as_posix(),
+                **launch_result,
+            }
+            return Observation(True, "app_launch", json.dumps(payload, ensure_ascii=False))
+        except Exception as exc:
+            return Observation(False, "app_launch", str(exc))
 
     def _self_improve_candidate_files(self, target: Path, hermes_root: Path, max_files: int) -> list[str]:
         files = [target] if target.is_file() else target.rglob("*")
@@ -477,6 +520,49 @@ class ToolBox:
                 pass
         webbrowser.open(url, new=2)
 
+    def _default_desktop_paths(self) -> list[Path]:
+        paths = [Path.home() / "Desktop"]
+        public = os.environ.get("PUBLIC")
+        if public:
+            paths.append(Path(public) / "Desktop")
+        return paths
+
+    def _find_desktop_shortcut(self, shortcut_name: str) -> Path:
+        for desktop in self.desktop_paths:
+            candidate = desktop / shortcut_name
+            if candidate.is_file() and candidate.suffix.lower() == ".lnk":
+                return candidate
+        searched = ", ".join(path.as_posix() for path in self.desktop_paths)
+        raise FileNotFoundError(f"找不到桌面捷徑：{shortcut_name}；搜尋位置：{searched}")
+
+    def _default_app_launcher(self, shortcut_path: Path) -> dict[str, str]:
+        if os.name != "nt":
+            raise RuntimeError("app_launch 目前只支援 Windows 桌面捷徑。")
+        script = f"""
+$shortcutPath = '{str(shortcut_path).replace("'", "''")}'
+$shell = New-Object -ComObject WScript.Shell
+$shortcut = $shell.CreateShortcut($shortcutPath)
+Start-Process -FilePath $shortcutPath
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+@{{
+  status = "launched"
+  target = $shortcut.TargetPath
+  arguments = $shortcut.Arguments
+  working_directory = $shortcut.WorkingDirectory
+}} | ConvertTo-Json -Compress
+"""
+        completed = subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=20,
+        )
+        if completed.returncode != 0:
+            raise RuntimeError(completed.stderr.strip() or "app_launch failed.")
+        return {str(k): str(v) for k, v in json.loads(completed.stdout).items()}
+
     def _is_allowed(self, command: str) -> bool:
         for allowed in self.allowed_commands:
             if command == allowed or command.startswith(allowed + " "):
@@ -529,4 +615,6 @@ class ToolBox:
             return self.gui_verify(kwargs.get("condition", ""))
         if name in {"gui_click", "gui_type_text", "gui_hotkey", "gui_wait"}:
             return self.gui_action_placeholder(name, **kwargs)
+        if name == "app_launch":
+            return self.app_launch(kwargs.get("shortcut", ""))
         return Observation(False, name, "未知工具。")

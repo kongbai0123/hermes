@@ -30,6 +30,11 @@ DEFAULT_CONFIG = {
         "window_title": "Google Chrome",
         "wait_seconds": 20
     },
+    "gui_runner": {
+        "enabled": True,
+        "mode": "windows",
+        "screenshot_dir": "trace/gui"
+    },
 }
 
 

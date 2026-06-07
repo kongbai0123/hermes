@@ -9,6 +9,7 @@ from .loop import AgentLoop
 from .roles import ManagerModel, WorkerModel
 from .tools import ToolBox
 from .external_chat import WindowsClipboardExternalChatBridge
+from .gui_agent import MockGuiRunner, WindowsGuiRunner
 
 
 def build_external_chat_bridge(config: dict):
@@ -23,6 +24,16 @@ def build_external_chat_bridge(config: dict):
     )
 
 
+def build_gui_runner(config: dict):
+    runner_config = dict(config.get("gui_runner", {}))
+    if not runner_config.get("enabled", False):
+        return MockGuiRunner()
+    if runner_config.get("mode") != "windows":
+        return MockGuiRunner()
+    screenshot_dir = runner_config.get("screenshot_dir", "trace/gui")
+    return WindowsGuiRunner(screenshot_dir=str(screenshot_dir))
+
+
 def build_agent(model_override: str | None = None) -> AgentLoop:
     config = load_config()
     llm = OllamaClient(model_override or config["model"], config["ollama_url"])
@@ -32,6 +43,7 @@ def build_agent(model_override: str | None = None) -> AgentLoop:
         allowed_proxy_domains=list(config.get("allowed_proxy_domains", [])),
         allowed_browser_domains=list(config.get("allowed_browser_domains", [])),
         external_chat_bridge=build_external_chat_bridge(config),
+        gui_runner=build_gui_runner(config),
     )
     limits = LoopLimits(
         max_steps=int(config.get("max_steps", 6)),
