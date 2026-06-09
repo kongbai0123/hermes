@@ -5,6 +5,8 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Check,
   ChevronDown,
+  Cloud,
+  Download,
   Mic,
   Paperclip,
   Send,
@@ -13,7 +15,7 @@ import {
 } from "lucide-react";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
-import { Attachment, ChatSettings, Message, ReasoningLevel, ResponseSpeed } from "@/types/chat";
+import { Attachment, ChatSettings, Message, Model, ReasoningLevel, ResponseSpeed } from "@/types/chat";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
   attachmentsToPromptNote,
@@ -27,6 +29,15 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 /**
  * MessageComposer: Input area for sending messages
@@ -57,6 +68,8 @@ export default function MessageComposer() {
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [downloadCandidate, setDownloadCandidate] = useState<Model | null>(null);
+  const [downloadPath, setDownloadPath] = useState("Ollama 預設模型目錄");
   const abortControllerRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const currentModel = state.models.find((model) => model.id === currentChat?.settings.model);
@@ -106,6 +119,14 @@ export default function MessageComposer() {
       },
       `模型已切換至 ${model.name}`
     );
+  };
+
+  const handleDownloadProposal = () => {
+    if (!downloadCandidate) return;
+    addSettingTimelineMessage(
+      `系統：已建立模型下載提案「${downloadCandidate.name}」。硬體匹配檢查與下載安裝路徑已待確認，尚未開始下載。`
+    );
+    setDownloadCandidate(null);
   };
 
   const handleReasoningChange = (reasoningLevel: ReasoningLevel) => {
@@ -438,17 +459,51 @@ export default function MessageComposer() {
                 <ChevronDown className="w-3 h-3" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>模型</DropdownMenuLabel>
-              {state.models.map((model) => (
-                <DropdownMenuItem key={model.id} onClick={() => handleModelChange(model.id)}>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium">{model.name}</div>
-                    <div className="truncate text-xs text-muted-foreground">{model.provider}</div>
-                  </div>
-                  {model.id === currentChat?.settings.model ? <Check className="w-4 h-4" /> : null}
-                </DropdownMenuItem>
-              ))}
+            <DropdownMenuContent align="end" className="h-[255px] w-[225px] overflow-hidden p-0">
+              <div className="border-b border-border px-3 py-2">
+                <DropdownMenuLabel className="p-0">模型</DropdownMenuLabel>
+              </div>
+              <div className="max-h-[216px] overflow-y-auto py-1">
+                <div className="px-3 py-1 text-[11px] font-medium text-muted-foreground">已安裝</div>
+                {state.models
+                  .filter((model) => (model.availability ?? "installed") === "installed")
+                  .map((model) => (
+                    <DropdownMenuItem key={model.id} onClick={() => handleModelChange(model.id)}>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium">{model.name}</div>
+                        <div className="truncate text-xs text-muted-foreground">{model.provider}</div>
+                      </div>
+                      {model.id === currentChat?.settings.model ? <Check className="w-4 h-4" /> : null}
+                    </DropdownMenuItem>
+                  ))}
+
+                <div className="mt-1 border-t border-border px-3 py-1 text-[11px] font-medium text-muted-foreground">
+                  可下載
+                </div>
+                {state.models
+                  .filter((model) => model.availability === "downloadable")
+                  .map((model) => (
+                    <DropdownMenuItem key={model.id} onClick={() => setDownloadCandidate(model)}>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium">{model.name}</div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {model.sizeGb?.toFixed(1)}GB / RAM {model.minRamGb}GB
+                        </div>
+                      </div>
+                      <Download className="w-4 h-4 text-muted-foreground" />
+                    </DropdownMenuItem>
+                  ))}
+
+                <div className="mt-1 border-t border-border px-3 py-1 text-[11px] font-medium text-muted-foreground">
+                  Cloud
+                </div>
+                {["glm-5.1:cloud", "qwen3.5:cloud"].map((name) => (
+                  <DropdownMenuItem key={name} disabled>
+                    <div className="min-w-0 flex-1 truncate font-medium">{name}</div>
+                    <Cloud className="w-4 h-4 text-muted-foreground" />
+                  </DropdownMenuItem>
+                ))}
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -526,6 +581,69 @@ export default function MessageComposer() {
       <p className="text-xs text-muted-foreground text-center">
         {t("composer.helper")}
       </p>
+
+      <Dialog open={Boolean(downloadCandidate)} onOpenChange={(open) => !open && setDownloadCandidate(null)}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>下載模型前確認</DialogTitle>
+            <DialogDescription>
+              這一步只建立下載提案，確認硬體與路徑後才會在下一階段接上實際下載。
+            </DialogDescription>
+          </DialogHeader>
+
+          {downloadCandidate ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-md border border-border p-4">
+                <h3 className="text-sm font-medium">硬體匹配檢查</h3>
+                <div className="mt-3 space-y-2 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">模型</span>
+                    <span className="font-medium">{downloadCandidate.name}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">預估大小</span>
+                    <span>{downloadCandidate.sizeGb?.toFixed(1)} GB</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">建議 RAM</span>
+                    <span>{downloadCandidate.minRamGb} GB</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">建議 VRAM</span>
+                    <span>{downloadCandidate.minVramGb ?? 0} GB</span>
+                  </div>
+                </div>
+                <p className="mt-3 rounded bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-300">
+                  基礎版尚未讀取實際硬體；下一階段會接 RAM / VRAM / disk 檢查。
+                </p>
+              </div>
+
+              <div className="rounded-md border border-border p-4">
+                <h3 className="text-sm font-medium">下載安裝路徑</h3>
+                <div className="mt-3 space-y-2">
+                  <label className="text-xs text-muted-foreground">模型名稱</label>
+                  <Input value={downloadCandidate.downloadName ?? downloadCandidate.name} readOnly />
+                  <label className="text-xs text-muted-foreground">安裝路徑</label>
+                  <Input value={downloadPath} onChange={(event) => setDownloadPath(event.target.value)} />
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  實際 Ollama pull 與進度寫入聊天列會在下一階段接上。
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDownloadCandidate(null)}>
+              取消
+            </Button>
+            <Button onClick={handleDownloadProposal} className="gap-2">
+              <Download className="h-4 w-4" />
+              建立下載提案
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

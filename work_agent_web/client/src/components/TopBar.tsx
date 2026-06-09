@@ -2,8 +2,9 @@ import { useChat } from "@/contexts/ChatContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
-import { Languages, MessageSquare, PanelRight, Settings, Moon, Sun } from "lucide-react";
+import { Languages, MessageSquare, Settings, Moon, Sun } from "lucide-react";
 import { createDefaultChat } from "@/lib/workAgent";
+import type { TaskMode } from "@/types/chat";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +16,13 @@ interface TopBarProps {
   agentFlowOpen: boolean;
   onToggleAgentFlow: () => void;
 }
+
+const taskModes: Array<{ id: TaskMode; label: string; title: string }> = [
+  { id: "single", label: "單模型", title: "一個模型負責理解、規劃與回覆" },
+  { id: "multi", label: "多模型", title: "Planner / Coder / Reviewer / External Model 分工" },
+  { id: "agent", label: "代理操作", title: "允許 GUI、瀏覽器、桌面 app 與外部視窗操作" },
+  { id: "orchestration", label: "任務編排", title: "分析任務後自動派工、審核、執行與彙整" },
+];
 
 export default function TopBar({ agentFlowOpen, onToggleAgentFlow }: TopBarProps) {
   const { state, dispatch } = useChat();
@@ -37,6 +45,17 @@ export default function TopBar({ agentFlowOpen, onToggleAgentFlow }: TopBarProps
     dispatch({ type: "TOGGLE_RIGHT_PANEL" });
   };
 
+  const handleTaskModeChange = (mode: TaskMode) => {
+    if (!currentChat) return;
+    dispatch({
+      type: "SET_TASK_MODE",
+      payload: {
+        chatId: currentChat.id,
+        mode,
+      },
+    });
+  };
+
   return (
     <header className="h-16 border-b border-border bg-background flex items-center justify-between px-4 gap-4">
       <div className="flex items-center gap-2 min-w-0">
@@ -48,23 +67,41 @@ export default function TopBar({ agentFlowOpen, onToggleAgentFlow }: TopBarProps
 
       <div className="flex-1 flex justify-center">
         {currentChat ? (
-          <div className="flex items-center gap-3">
-            <div className="hidden md:flex items-center gap-2 text-xs">
-              <span className="rounded-full border border-border px-2 py-1 text-muted-foreground">
-                {currentChat.workbench.safetyModeLabel ? t("top.safeMode") : t("top.safeMode")}
-              </span>
-              <span
-                className={`rounded-full px-2 py-1 font-medium ${
-                  currentChat.workbench.status === "error"
-                    ? "bg-destructive/10 text-destructive"
-                    : currentChat.workbench.status === "running"
-                      ? "bg-amber-500/10 text-amber-600"
-                      : "bg-primary/10 text-primary"
-                }`}
-              >
-                {t(`status.${currentChat.workbench.status}`)}
-              </span>
-            </div>
+          <div className="flex min-w-0 max-w-full items-center overflow-x-auto rounded-full border border-border bg-muted/40 p-1">
+            {taskModes.map((mode) => {
+              const isActive = (currentChat.taskMode ?? "single") === mode.id;
+
+              return (
+                <button
+                  key={mode.id}
+                  type="button"
+                  title={mode.title}
+                  aria-pressed={isActive}
+                  onClick={() => handleTaskModeChange(mode.id)}
+                  className={`h-8 whitespace-nowrap rounded-full px-3 text-xs font-medium transition-colors ${
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-background hover:text-foreground"
+                  }`}
+                >
+                  {mode.label}
+                </button>
+              );
+            })}
+            <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
+            <button
+              type="button"
+              title={agentFlowOpen ? "隱藏運行監控" : "顯示運行監控"}
+              aria-pressed={agentFlowOpen}
+              onClick={onToggleAgentFlow}
+              className={`h-8 whitespace-nowrap rounded-full px-3 text-xs font-medium transition-colors ${
+                agentFlowOpen
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-background hover:text-foreground"
+              }`}
+            >
+              運行監控
+            </button>
           </div>
         ) : (
           <div className="text-sm text-muted-foreground">{t("top.createTask")}</div>
@@ -102,15 +139,6 @@ export default function TopBar({ agentFlowOpen, onToggleAgentFlow }: TopBarProps
           title={t("top.switchTheme", { mode: theme === "light" ? "dark" : "light" })}
         >
           {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-        </Button>
-
-        <Button
-          variant={agentFlowOpen ? "secondary" : "ghost"}
-          size="icon"
-          onClick={onToggleAgentFlow}
-          title={agentFlowOpen ? t("flow.hide") : t("flow.show")}
-        >
-          <PanelRight className="w-5 h-5" />
         </Button>
 
         <Button

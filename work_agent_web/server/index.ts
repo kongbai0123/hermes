@@ -15,6 +15,23 @@ async function startServer() {
   const workspaceRoot = path.resolve(__dirname, "..", "..", "work_agent", "workspace");
   const chatStatePath = path.resolve(__dirname, "..", "data", "chat-state.json");
 
+  let lastHeartbeat = Date.now();
+  let hasReceivedFirstHeartbeat = false;
+
+  app.post("/api/heartbeat", (_req, res) => {
+    lastHeartbeat = Date.now();
+    hasReceivedFirstHeartbeat = true;
+    res.json({ ok: true });
+  });
+
+  const heartbeatInterval = setInterval(() => {
+    if (hasReceivedFirstHeartbeat && Date.now() - lastHeartbeat > 7000) {
+      console.log("[Heartbeat] No heartbeat detected for 7 seconds. Shutting down server...");
+      clearInterval(heartbeatInterval);
+      process.exit(0);
+    }
+  }, 3000);
+
   app.get("/api/chat-state", async (_req, res) => {
     try {
       const state = await readChatState(chatStatePath);

@@ -3,11 +3,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, CheckCircle2, CircleAlert, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Check, CheckCircle2, CircleAlert, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
+import type { AgentPermission, AgentSlot, Chat, ChatSettings } from "@/types/chat";
+
+const permissionOptions: Array<{ id: AgentPermission; label: string }> = [
+  { id: "plan", label: "Plan" },
+  { id: "code", label: "Code" },
+  { id: "review", label: "Review" },
+  { id: "verify", label: "Verify" },
+  { id: "tools", label: "Tools" },
+  { id: "gui", label: "GUI" },
+  { id: "external", label: "External" },
+];
 
 export default function RightPanel() {
   const { dispatch, currentChat } = useChat();
@@ -48,6 +61,28 @@ export default function RightPanel() {
         settings: { systemPrompt: value },
       },
     });
+  };
+
+  const handleAgentUpdate = (slotId: string, updates: Partial<AgentSlot>) => {
+    dispatch({
+      type: "UPDATE_AGENT_SLOT",
+      payload: {
+        chatId: currentChat.id,
+        slotId,
+        updates,
+      },
+    });
+  };
+
+  const handleAgentPermissionToggle = (
+    slot: AgentSlot,
+    permission: AgentPermission,
+    checked: boolean
+  ) => {
+    const permissions = checked
+      ? Array.from(new Set([...slot.permissions, permission]))
+      : slot.permissions.filter((item) => item !== permission);
+    handleAgentUpdate(slot.id, { permissions });
   };
 
   const handleGeneratePatch = async () => {
@@ -164,23 +199,17 @@ export default function RightPanel() {
         </Button>
       </div>
 
-      <Tabs defaultValue="workbench" className="flex-1 flex flex-col overflow-hidden">
-        <TabsList className="w-full rounded-none border-b border-border">
-          <TabsTrigger value="workbench" className="flex-1">
-            {t("panel.workbench")}
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="flex-1">
-            {t("panel.settings")}
-          </TabsTrigger>
-          <TabsTrigger value="context" className="flex-1">
-            {t("panel.context")}
-          </TabsTrigger>
-          <TabsTrigger value="patch" className="flex-1">
-            {t("panel.patch")}
-          </TabsTrigger>
+      <Tabs defaultValue="flow" className="flex-1 flex flex-col overflow-hidden">
+        <TabsList className="grid h-auto w-full grid-cols-3 rounded-none border-b border-border p-1">
+          <TabsTrigger value="flow">流程</TabsTrigger>
+          <TabsTrigger value="team">Agent Team</TabsTrigger>
+          <TabsTrigger value="tools">工具</TabsTrigger>
+          <TabsTrigger value="files">檔案</TabsTrigger>
+          <TabsTrigger value="patch">{t("panel.patch")}</TabsTrigger>
+          <TabsTrigger value="settings">{t("panel.settings")}</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="workbench" className="flex-1 overflow-y-auto p-4 space-y-6">
+        <TabsContent value="flow" className="flex-1 overflow-y-auto p-4 space-y-6">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <h3 className="font-medium">{t("panel.executionStatus")}</h3>
@@ -215,7 +244,134 @@ export default function RightPanel() {
               </p>
             )}
           </div>
+        </TabsContent>
 
+        <TabsContent value="team" className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="font-medium">代理團隊</h3>
+                <p className="text-xs text-muted-foreground">
+                  多模型模式可手動調整 Agent 數量、角色、模型與 skill。
+                </p>
+              </div>
+              <Button
+                size="sm"
+                className="gap-2"
+                onClick={() =>
+                  dispatch({ type: "ADD_AGENT_SLOT", payload: { chatId: currentChat.id } })
+                }
+              >
+                <Plus className="h-4 w-4" />
+                新增
+              </Button>
+            </div>
+            <div className="rounded-md border border-border p-3 text-xs text-muted-foreground">
+              目前任務模式：{taskModeDisplayName(currentChat.taskMode)}，已啟用{" "}
+              {currentChat.agentTeam.filter((slot) => slot.isEnabled).length} /{" "}
+              {currentChat.agentTeam.length} 個 Agent。
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {currentChat.agentTeam.map((slot, index) => (
+              <div key={slot.id} className="rounded-md border border-border p-3 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Agent {index + 1}</p>
+                    <Input
+                      value={slot.name}
+                      onChange={(event) => handleAgentUpdate(slot.id, { name: event.target.value })}
+                      className="mt-1 h-8 font-medium"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant={slot.isEnabled ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => handleAgentUpdate(slot.id, { isEnabled: !slot.isEnabled })}
+                    >
+                      {slot.isEnabled ? "啟用" : "停用"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="刪除 Agent"
+                      onClick={() =>
+                        dispatch({
+                          type: "DELETE_AGENT_SLOT",
+                          payload: { chatId: currentChat.id, slotId: slot.id },
+                        })
+                      }
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="space-y-1">
+                    <Label>角色事項</Label>
+                    <Input
+                      value={slot.role}
+                      onChange={(event) => handleAgentUpdate(slot.id, { role: event.target.value })}
+                      placeholder="例如 Planner / Coder / Reviewer"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>使用模型</Label>
+                    <Input
+                      value={slot.model}
+                      onChange={(event) => handleAgentUpdate(slot.id, { model: event.target.value })}
+                      placeholder="例如 ollama-gemma4"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>輸出格式</Label>
+                    <Input
+                      value={slot.outputFormat}
+                      onChange={(event) =>
+                        handleAgentUpdate(slot.id, { outputFormat: event.target.value })
+                      }
+                      placeholder="plan / proposal / critique / summary"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Agent Skill</Label>
+                    <Textarea
+                      value={slot.skill}
+                      onChange={(event) => handleAgentUpdate(slot.id, { skill: event.target.value })}
+                      className="min-h-24 resize-none"
+                      placeholder="描述這個 Agent 的目標、責任、禁止事項、輸入來源與完成條件。"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>權限邊界</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {permissionOptions.map((permission) => (
+                      <label
+                        key={permission.id}
+                        className="flex items-center gap-2 rounded-md border border-border p-2 text-sm"
+                      >
+                        <Checkbox
+                          checked={slot.permissions.includes(permission.id)}
+                          onCheckedChange={(checked) =>
+                            handleAgentPermissionToggle(slot, permission.id, checked === true)
+                          }
+                        />
+                        <span>{permission.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="tools" className="flex-1 overflow-y-auto p-4 space-y-6">
           <div className="space-y-2">
             <h3 className="font-medium">{t("panel.toolLog")}</h3>
             {currentChat.workbench.toolLogs.length > 0 ? (
@@ -267,37 +423,11 @@ export default function RightPanel() {
               ))}
             </div>
           </div>
+        </TabsContent>
 
-          <div className="space-y-2">
-            <h3 className="font-medium">{t("panel.workspace")}</h3>
-            <div className="space-y-2">
-              {currentChat.workbench.workspaceEntries.map((entry) => (
-                <div key={entry.id} className="rounded-md border border-border p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium">{entry.path}</span>
-                    <span className="text-xs uppercase text-muted-foreground">{entry.kind}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{entry.summary}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <h3 className="font-medium">{t("panel.selectedFile")}</h3>
-            {currentChat.workbench.selectedFile ? (
-              <div className="rounded-md border border-border p-3 space-y-2">
-                <p className="text-sm font-medium">{currentChat.workbench.selectedFile.path}</p>
-                <pre className="max-h-64 overflow-auto rounded bg-secondary p-3 text-xs whitespace-pre-wrap break-words">
-                  {currentChat.workbench.selectedFile.content}
-                </pre>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {t("panel.selectFilePreview")}
-              </p>
-            )}
-          </div>
+        <TabsContent value="files" className="flex-1 overflow-y-auto p-4 space-y-6">
+          <WorkspaceSection currentChat={currentChat} t={t} />
+          <ContextSection currentChat={currentChat} settings={settings} t={t} />
         </TabsContent>
 
         <TabsContent value="settings" className="flex-1 overflow-y-auto p-4 space-y-6">
@@ -447,4 +577,101 @@ function translateSafetyRule(
   };
   const key = keyById[id]?.[field];
   return key ? t(key) : fallback;
+}
+
+function WorkspaceSection({
+  currentChat,
+  t,
+}: {
+  currentChat: Chat;
+  t: (key: string, values?: Record<string, string | number>) => string;
+}) {
+  return (
+    <>
+      <div className="space-y-2">
+        <h3 className="font-medium">{t("panel.workspace")}</h3>
+        <div className="space-y-2">
+          {currentChat.workbench.workspaceEntries.map((entry) => (
+            <div key={entry.id} className="rounded-md border border-border p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium">{entry.path}</span>
+                <span className="text-xs uppercase text-muted-foreground">{entry.kind}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">{entry.summary}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <h3 className="font-medium">{t("panel.selectedFile")}</h3>
+        {currentChat.workbench.selectedFile ? (
+          <div className="rounded-md border border-border p-3 space-y-2">
+            <p className="text-sm font-medium">{currentChat.workbench.selectedFile.path}</p>
+            <pre className="max-h-64 overflow-auto rounded bg-secondary p-3 text-xs whitespace-pre-wrap break-words">
+              {currentChat.workbench.selectedFile.content}
+            </pre>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">{t("panel.selectFilePreview")}</p>
+        )}
+      </div>
+    </>
+  );
+}
+
+function ContextSection({
+  currentChat,
+  settings,
+  t,
+}: {
+  currentChat: Chat;
+  settings: ChatSettings;
+  t: (key: string, values?: Record<string, string | number>) => string;
+}) {
+  return (
+    <>
+      <div className="space-y-2">
+        <h3 className="font-medium">{t("panel.attachedFiles")}</h3>
+        {currentChat.messages.some((m) => m.attachments?.length) ? (
+          <div className="space-y-2">
+            {currentChat.messages.flatMap((m) => m.attachments || []).map((file) => (
+              <div key={file.id} className="p-2 bg-secondary rounded text-sm">
+                <p className="font-medium truncate">{file.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {(file.size / 1024).toFixed(1)} KB
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">{t("panel.noFiles")}</p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <h3 className="font-medium">{t("panel.contextWindow")}</h3>
+        <div className="p-3 bg-secondary rounded space-y-1">
+          <div className="flex justify-between text-sm">
+            <span>{t("panel.messages")}</span>
+            <span className="font-medium">{currentChat.messages.length}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span>{t("panel.model")}</span>
+            <span className="font-medium text-primary">{settings.model}</span>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function taskModeDisplayName(mode: Chat["taskMode"]) {
+  const labels: Record<Chat["taskMode"], string> = {
+    single: "單模型",
+    multi: "多模型",
+    agent: "代理操作",
+    orchestration: "任務編排",
+  };
+  return labels[mode ?? "single"];
 }

@@ -30,6 +30,8 @@ export default function AppShell() {
         onToggleAgentFlow={() => setAgentFlowOpen((current) => !current)}
       />
 
+      <AgentFlowPanel isOpen={agentFlowOpen} onClose={() => setAgentFlowOpen(false)} />
+
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar - Chat History */}
@@ -41,8 +43,6 @@ export default function AppShell() {
         {/* Right Panel - Optional Context/Settings */}
         {state.rightPanelOpen && <RightPanel />}
       </div>
-
-      <AgentFlowPanel isOpen={agentFlowOpen} onClose={() => setAgentFlowOpen(false)} />
     </div>
   );
 }

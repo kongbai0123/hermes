@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useReducer, useRef, ReactNode } from "react";
-import { AppState, ChatAction, Chat } from "@/types/chat";
-import { WORK_AGENT_MODELS } from "@/lib/workAgent";
+import { AppState, ChatAction, Chat, TaskMode } from "@/types/chat";
+import { DEFAULT_AGENT_TEAM, WORK_AGENT_MODELS } from "@/lib/workAgent";
 import {
   fetchServerChatState,
   persistServerChatState,
@@ -29,6 +29,17 @@ const initialState: AppState = {
   rightPanelOpen: false,
 };
 
+const taskModeLabels: Record<TaskMode, string> = {
+  single: "單模型",
+  multi: "多模型",
+  agent: "代理操作",
+  orchestration: "任務編排",
+};
+
+function cloneDefaultAgentTeam() {
+  return DEFAULT_AGENT_TEAM.map((slot) => ({ ...slot, permissions: [...slot.permissions] }));
+}
+
 function reviveDate(value: unknown): Date {
   if (value instanceof Date) return value;
   const date = new Date(String(value || Date.now()));
@@ -46,6 +57,14 @@ export function restoreChatState(serialized: string | null): AppState {
       models: WORK_AGENT_MODELS,
       chats: (parsed.chats || []).map((chat) => ({
         ...chat,
+        taskMode: chat.taskMode ?? "single",
+        agentTeam: chat.agentTeam?.length
+          ? chat.agentTeam.map((slot) => ({
+              ...slot,
+              permissions: [...(slot.permissions || [])],
+              isEnabled: slot.isEnabled ?? true,
+            }))
+          : cloneDefaultAgentTeam(),
         createdAt: reviveDate(chat.createdAt),
         updatedAt: reviveDate(chat.updatedAt),
         settings: {
@@ -238,6 +257,101 @@ export function chatReducer(state: AppState, action: ChatAction): AppState {
                 model: action.payload.settings.model ?? chat.model,
                 provider: action.payload.settings.provider ?? chat.provider,
                 settings: { ...chat.settings, ...action.payload.settings },
+              }
+            : chat
+        ),
+      };
+    }
+
+    case "SET_TASK_MODE": {
+      return {
+        ...state,
+        chats: state.chats.map((chat) => {
+          if (chat.id !== action.payload.chatId) return chat;
+          if (chat.taskMode === action.payload.mode) return chat;
+
+          return {
+            ...chat,
+            taskMode: action.payload.mode,
+            updatedAt: new Date(),
+            messages: [
+              ...chat.messages,
+              {
+                id: `task-mode-${Date.now()}`,
+                chatId: chat.id,
+                role: "system",
+                content: `系統：任務模式已切換為「${taskModeLabels[action.payload.mode]}」。`,
+                createdAt: new Date(),
+              },
+            ],
+          };
+        }),
+      };
+    }
+
+    case "ADD_AGENT_SLOT": {
+      return {
+        ...state,
+        chats: state.chats.map((chat) => {
+          if (chat.id !== action.payload.chatId) return chat;
+
+          const currentTeam = chat.agentTeam?.length ? chat.agentTeam : cloneDefaultAgentTeam();
+          const nextNumber = currentTeam.length + 1;
+
+          return {
+            ...chat,
+            updatedAt: new Date(),
+            agentTeam: [
+              ...currentTeam,
+              {
+                id: `agent-${Date.now()}`,
+                name: `Agent ${nextNumber}`,
+                role: "自訂角色",
+                model: chat.settings.model,
+                skill: "描述這個 Agent 的任務、責任範圍、禁止事項與完成條件。",
+                permissions: ["plan"],
+                outputFormat: "summary",
+                isEnabled: true,
+              },
+            ],
+          };
+        }),
+      };
+    }
+
+    case "UPDATE_AGENT_SLOT": {
+      return {
+        ...state,
+        chats: state.chats.map((chat) =>
+          chat.id === action.payload.chatId
+            ? {
+                ...chat,
+                updatedAt: new Date(),
+                agentTeam: (chat.agentTeam || cloneDefaultAgentTeam()).map((slot) =>
+                  slot.id === action.payload.slotId
+                    ? {
+                        ...slot,
+                        ...action.payload.updates,
+                        permissions:
+                          action.payload.updates.permissions ?? slot.permissions,
+                      }
+                    : slot
+                ),
+              }
+            : chat
+        ),
+      };
+    }
+
+    case "DELETE_AGENT_SLOT": {
+      return {
+        ...state,
+        chats: state.chats.map((chat) =>
+          chat.id === action.payload.chatId
+            ? {
+                ...chat,
+                updatedAt: new Date(),
+                agentTeam: (chat.agentTeam || []).filter((slot) => slot.id !== action.payload.slotId),
               }
             : chat
         ),

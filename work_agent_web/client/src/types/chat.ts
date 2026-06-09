@@ -4,6 +4,8 @@ export type WorkbenchStatus = "idle" | "running" | "done" | "error";
 export type PlanStepStatus = "pending" | "running" | "done" | "error";
 export type ReasoningLevel = "low" | "medium" | "high" | "ultra";
 export type ResponseSpeed = "slow" | "standard" | "fast";
+export type TaskMode = "single" | "multi" | "agent" | "orchestration";
+export type AgentPermission = "plan" | "code" | "review" | "verify" | "tools" | "gui" | "external";
 
 export interface Model {
   id: string;
@@ -11,6 +13,11 @@ export interface Model {
   provider: Provider;
   isActive: boolean;
   description: string;
+  availability?: "installed" | "downloadable" | "cloud";
+  sizeGb?: number;
+  minRamGb?: number;
+  minVramGb?: number;
+  downloadName?: string;
 }
 
 export interface Attachment {
@@ -70,6 +77,17 @@ export interface PatchProposal {
   revisedContent?: string;
 }
 
+export interface AgentSlot {
+  id: string;
+  name: string;
+  role: string;
+  model: string;
+  skill: string;
+  permissions: AgentPermission[];
+  outputFormat: string;
+  isEnabled: boolean;
+}
+
 export interface WorkbenchState {
   status: WorkbenchStatus;
   plan: WorkbenchPlanStep[];
@@ -110,10 +128,12 @@ export interface Chat {
   title: string;
   model: string;
   provider: Provider;
+  taskMode: TaskMode;
   createdAt: Date;
   updatedAt: Date;
   messages: Message[];
   settings: ChatSettings;
+  agentTeam: AgentSlot[];
   isPinned?: boolean;
   workbench: WorkbenchState;
 }
@@ -150,6 +170,22 @@ export type ChatAction =
   | {
       type: "UPDATE_CHAT_SETTINGS";
       payload: { chatId: string; settings: Partial<ChatSettings> };
+    }
+  | {
+      type: "SET_TASK_MODE";
+      payload: { chatId: string; mode: TaskMode };
+    }
+  | {
+      type: "ADD_AGENT_SLOT";
+      payload: { chatId: string };
+    }
+  | {
+      type: "UPDATE_AGENT_SLOT";
+      payload: { chatId: string; slotId: string; updates: Partial<AgentSlot> };
+    }
+  | {
+      type: "DELETE_AGENT_SLOT";
+      payload: { chatId: string; slotId: string };
     }
   | {
       type: "UPDATE_WORKBENCH";

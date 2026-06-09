@@ -113,6 +113,140 @@ describe("chatReducer project item filing", () => {
     expect(nextState.chats[0].messages[0].role).toBe("system");
     expect(nextState.chats[0].messages[0].content).toBe("推理已切換至 高");
   });
+
+  it("switches the task mode and records the change in the chat timeline", () => {
+    const state: AppState = {
+      ...baseState,
+      chats: [
+        {
+          id: "chat-1",
+          title: "Mode test",
+          model: "ollama-gemma4",
+          provider: "ollama",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          messages: [],
+          settings: {
+            model: "ollama-gemma4",
+            provider: "ollama",
+            temperature: 0.2,
+            maxTokens: 2000,
+            systemPrompt: "",
+            reasoningLevel: "medium",
+            responseSpeed: "standard",
+          },
+          workbench: {
+            status: "idle",
+            plan: [],
+            toolLogs: [],
+            safetyRules: [],
+            workspaceEntries: [],
+            selectedFile: null,
+            patch: null,
+          },
+        },
+      ],
+    };
+
+    const nextState = chatReducer(state, {
+      type: "SET_TASK_MODE",
+      payload: {
+        chatId: "chat-1",
+        mode: "orchestration",
+      },
+    });
+
+    expect(nextState.chats[0].taskMode).toBe("orchestration");
+    expect(nextState.chats[0].messages).toHaveLength(1);
+    expect(nextState.chats[0].messages[0].role).toBe("system");
+    expect(nextState.chats[0].messages[0].content).toBe("系統：任務模式已切換為「任務編排」。");
+  });
+
+  it("manages agent team slots for multi-model work", () => {
+    const state: AppState = {
+      ...baseState,
+      chats: [
+        {
+          id: "chat-1",
+          title: "Agent team test",
+          model: "ollama-gemma4",
+          provider: "ollama",
+          taskMode: "multi",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          messages: [],
+          settings: {
+            model: "ollama-gemma4",
+            provider: "ollama",
+            temperature: 0.2,
+            maxTokens: 2000,
+            systemPrompt: "",
+            reasoningLevel: "medium",
+            responseSpeed: "standard",
+          },
+          agentTeam: [
+            {
+              id: "planner",
+              name: "Planner",
+              role: "規劃者",
+              model: "ollama-gemma4",
+              skill: "拆解任務並定義成功條件。",
+              permissions: ["plan"],
+              outputFormat: "plan",
+              isEnabled: true,
+            },
+          ],
+          workbench: {
+            status: "idle",
+            plan: [],
+            toolLogs: [],
+            safetyRules: [],
+            workspaceEntries: [],
+            selectedFile: null,
+            patch: null,
+          },
+        },
+      ],
+    };
+
+    const added = chatReducer(state, {
+      type: "ADD_AGENT_SLOT",
+      payload: { chatId: "chat-1" },
+    });
+
+    expect(added.chats[0].agentTeam).toHaveLength(2);
+    expect(added.chats[0].agentTeam[1].name).toBe("Agent 2");
+
+    const updated = chatReducer(added, {
+      type: "UPDATE_AGENT_SLOT",
+      payload: {
+        chatId: "chat-1",
+        slotId: added.chats[0].agentTeam[1].id,
+        updates: {
+          name: "Reviewer",
+          role: "審核者",
+          skill: "檢查輸出是否符合需求、安全規則與測試結果。",
+          permissions: ["review", "verify"],
+          outputFormat: "critique",
+        },
+      },
+    });
+
+    expect(updated.chats[0].agentTeam[1].name).toBe("Reviewer");
+    expect(updated.chats[0].agentTeam[1].permissions).toEqual(["review", "verify"]);
+    expect(updated.chats[0].agentTeam[1].outputFormat).toBe("critique");
+
+    const removed = chatReducer(updated, {
+      type: "DELETE_AGENT_SLOT",
+      payload: {
+        chatId: "chat-1",
+        slotId: "planner",
+      },
+    });
+
+    expect(removed.chats[0].agentTeam).toHaveLength(1);
+    expect(removed.chats[0].agentTeam[0].name).toBe("Reviewer");
+  });
 });
 
 describe("restoreChatState", () => {
@@ -164,5 +298,8 @@ describe("restoreChatState", () => {
     expect(restored.chats[0].messages[0].createdAt).toBeInstanceOf(Date);
     expect(restored.chats[0].settings.reasoningLevel).toBe("medium");
     expect(restored.chats[0].settings.responseSpeed).toBe("standard");
+    expect(restored.chats[0].taskMode).toBe("single");
+    expect(restored.chats[0].agentTeam).toHaveLength(2);
+    expect(restored.chats[0].agentTeam[0].name).toBe("Planner");
   });
 });

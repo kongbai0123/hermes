@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -18,6 +19,21 @@ import ErrorBoundary from "./components/ErrorBoundary";
  */
 
 function App() {
+  useEffect(() => {
+    const sendHeartbeat = () => {
+      fetch("/api/heartbeat", { method: "POST" }).catch((err) => {
+        console.error("Heartbeat failed", err);
+      });
+    };
+
+    // Send first heartbeat immediately
+    sendHeartbeat();
+
+    // Check periodically
+    const interval = setInterval(sendHeartbeat, 2500);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">

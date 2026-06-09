@@ -12,8 +12,6 @@ if not exist "dist\index.js" (
   )
 )
 
-start "Work Agent Web Server" cmd /k "cd /d %~dp0 && node dist\index.js"
-powershell -NoProfile -Command "Start-Sleep -Seconds 3; Start-Process 'http://localhost:3000'"
-
-echo [Work Agent Web] Browser should open at http://localhost:3000
+start /b powershell -NoProfile -Command "Start-Sleep -Seconds 2; Start-Process 'http://localhost:3000'"
+node dist\index.js
 exit /b 0
