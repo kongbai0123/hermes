@@ -1,4 +1,5 @@
 import { nanoid } from "nanoid";
+import { createDefaultAgentGraph } from "@/lib/agentGraph";
 import type {
   Chat,
   AgentSlot,
@@ -145,6 +146,7 @@ export function createDefaultChat(models: Model[]): Chat {
     updatedAt: new Date(),
     messages: [],
     agentTeam: DEFAULT_AGENT_TEAM.map((slot) => ({ ...slot, permissions: [...slot.permissions] })),
+    agentGraph: createDefaultAgentGraph(DEFAULT_AGENT_TEAM),
     settings: {
       model: activeModel.id,
       provider: activeModel.provider,

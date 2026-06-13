@@ -187,7 +187,10 @@ export default function MessageComposer() {
     abortControllerRef.current = controller;
 
     try {
-      const response = await fetch("/api/work-agent/run-stream", {
+      const isGraphRun = currentChat.taskMode === "orchestration";
+      const response = await fetch(
+        isGraphRun ? "/api/work-agent/run-graph-stream" : "/api/work-agent/run-stream",
+        {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -195,9 +198,12 @@ export default function MessageComposer() {
           model: currentChat.settings.model,
           reasoningLevel: currentChat.settings.reasoningLevel,
           responseSpeed: currentChat.settings.responseSpeed,
+          team: currentChat.agentTeam,
+          graph: currentChat.agentGraph,
         }),
         signal: controller.signal,
-      });
+        }
+      );
       if (!response.ok || !response.body) {
         throw new Error(t("error.streamFailed"));
       }
@@ -241,6 +247,13 @@ export default function MessageComposer() {
             });
           }
 
+          if (event.type === "graph-start") {
+            dispatch({
+              type: "INITIALIZE_AGENT_RUNS",
+              payload: { chatId: currentChat.id, at: Date.now() },
+            });
+          }
+
           if (event.type === "chunk") {
             assistantContent += String(event.content ?? "");
             dispatch({
@@ -256,7 +269,110 @@ export default function MessageComposer() {
             });
           }
 
-          if (event.type === "done") {
+          if (event.type === "joint-start") {
+            dispatch({
+              type: "UPDATE_AGENT_RUN_EVENT",
+              payload: {
+                chatId: currentChat.id,
+                event: {
+                  type: "joint-start",
+                  agentId: String(event.agentId),
+                  name: event.name ? String(event.name) : undefined,
+                  role: event.role ? String(event.role) : undefined,
+                  model: event.model ? String(event.model) : undefined,
+                  at: Date.now(),
+                },
+              },
+            });
+            assistantContent += `${assistantContent ? "\n\n" : ""}### ${event.name ?? event.agentId}\n執行中...`;
+            dispatch({
+              type: "UPDATE_MESSAGE",
+              payload: {
+                id: assistantMessageId,
+                chatId: currentChat.id,
+                role: "assistant",
+                content: assistantContent,
+                createdAt: new Date(),
+                isStreaming: true,
+              },
+            });
+          }
+
+          if (event.type === "joint-complete") {
+            dispatch({
+              type: "UPDATE_AGENT_RUN_EVENT",
+              payload: {
+                chatId: currentChat.id,
+                event: {
+                  type: "joint-complete",
+                  agentId: String(event.agentId),
+                  name: event.name ? String(event.name) : undefined,
+                  answer: String(event.answer ?? ""),
+                  at: Date.now(),
+                },
+              },
+            });
+            assistantContent = assistantContent.replace(
+              `### ${event.name ?? event.agentId}\n執行中...`,
+              `### ${event.name ?? event.agentId}\n${String(event.answer ?? "")}`
+            );
+            dispatch({
+              type: "UPDATE_MESSAGE",
+              payload: {
+                id: assistantMessageId,
+                chatId: currentChat.id,
+                role: "assistant",
+                content: assistantContent,
+                createdAt: new Date(),
+                isStreaming: true,
+              },
+            });
+          }
+
+          if (event.type === "joint-error") {
+            dispatch({
+              type: "UPDATE_AGENT_RUN_EVENT",
+              payload: {
+                chatId: currentChat.id,
+                event: {
+                  type: "joint-error",
+                  agentId: String(event.agentId),
+                  name: event.name ? String(event.name) : undefined,
+                  error: String(event.error ?? t("error.requestFailed")),
+                  at: Date.now(),
+                },
+              },
+            });
+            assistantContent += `${assistantContent ? "\n\n" : ""}### ${event.name ?? event.agentId}\n錯誤：${String(event.error ?? t("error.requestFailed"))}`;
+            dispatch({
+              type: "UPDATE_MESSAGE",
+              payload: {
+                id: assistantMessageId,
+                chatId: currentChat.id,
+                role: "assistant",
+                content: assistantContent,
+                createdAt: new Date(),
+                isStreaming: true,
+              },
+            });
+          }
+
+          if (event.type === "joint-skip") {
+            dispatch({
+              type: "UPDATE_AGENT_RUN_EVENT",
+              payload: {
+                chatId: currentChat.id,
+                event: {
+                  type: "joint-skip",
+                  agentId: String(event.agentId),
+                  reason: event.reason ? String(event.reason) : undefined,
+                  at: Date.now(),
+                },
+              },
+            });
+          }
+
+          if (event.type === "done" || event.type === "graph-complete") {
             dispatch({
               type: "UPDATE_MESSAGE",
               payload: {

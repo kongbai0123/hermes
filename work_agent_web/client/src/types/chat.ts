@@ -88,6 +88,79 @@ export interface AgentSlot {
   isEnabled: boolean;
 }
 
+export interface AgentGraphPosition {
+  x: number;
+  y: number;
+}
+
+export interface AgentGraphEdge {
+  id: string;
+  from: string;
+  to: string;
+}
+
+export interface AgentGraph {
+  edges: AgentGraphEdge[];
+  positions: Record<string, AgentGraphPosition>;
+}
+
+export type AgentRunStatus = "queued" | "running" | "complete" | "error" | "skipped";
+
+export interface AgentRunRecord {
+  agentId: string;
+  name: string;
+  role?: string;
+  model?: string;
+  status: AgentRunStatus;
+  startedAt?: number;
+  completedAt?: number;
+  updatedAt: number;
+  minVisibleUntil?: number;
+  output?: string;
+  error?: string;
+}
+
+export interface AgentRunLogEntry {
+  id: string;
+  agentId: string;
+  name: string;
+  event: AgentRunEvent["type"];
+  message: string;
+  createdAt: number;
+}
+
+export type AgentRunEvent =
+  | {
+      type: "joint-start";
+      agentId: string;
+      name?: string;
+      role?: string;
+      model?: string;
+      at: number;
+      minVisibleMs?: number;
+    }
+  | {
+      type: "joint-complete";
+      agentId: string;
+      name?: string;
+      answer?: string;
+      at: number;
+    }
+  | {
+      type: "joint-error";
+      agentId: string;
+      name?: string;
+      error?: string;
+      at: number;
+    }
+  | {
+      type: "joint-skip";
+      agentId: string;
+      name?: string;
+      reason?: string;
+      at: number;
+    };
+
 export interface WorkbenchState {
   status: WorkbenchStatus;
   plan: WorkbenchPlanStep[];
@@ -98,6 +171,8 @@ export interface WorkbenchState {
   safetyModeLabel?: string;
   selectedFile?: WorkspaceFilePreview | null;
   patch?: PatchProposal | null;
+  agentRuns?: Record<string, AgentRunRecord>;
+  agentRunLog?: AgentRunLogEntry[];
 }
 
 export interface ChatSettings {
@@ -134,6 +209,7 @@ export interface Chat {
   messages: Message[];
   settings: ChatSettings;
   agentTeam: AgentSlot[];
+  agentGraph?: AgentGraph;
   isPinned?: boolean;
   workbench: WorkbenchState;
 }
@@ -177,7 +253,7 @@ export type ChatAction =
     }
   | {
       type: "ADD_AGENT_SLOT";
-      payload: { chatId: string };
+      payload: { chatId: string; slot?: AgentSlot };
     }
   | {
       type: "UPDATE_AGENT_SLOT";
@@ -186,6 +262,30 @@ export type ChatAction =
   | {
       type: "DELETE_AGENT_SLOT";
       payload: { chatId: string; slotId: string };
+    }
+  | {
+      type: "ADD_AGENT_GRAPH_EDGE";
+      payload: { chatId: string; from: string; to: string };
+    }
+  | {
+      type: "DELETE_AGENT_GRAPH_EDGE";
+      payload: { chatId: string; edgeId: string };
+    }
+  | {
+      type: "UPDATE_AGENT_GRAPH_POSITION";
+      payload: { chatId: string; agentId: string; position: AgentGraphPosition };
+    }
+  | {
+      type: "APPLY_AGENT_FLOW_RECOMMENDATION";
+      payload: { chatId: string; recommendationId: string };
+    }
+  | {
+      type: "INITIALIZE_AGENT_RUNS";
+      payload: { chatId: string; at?: number };
+    }
+  | {
+      type: "UPDATE_AGENT_RUN_EVENT";
+      payload: { chatId: string; event: AgentRunEvent };
     }
   | {
       type: "UPDATE_WORKBENCH";

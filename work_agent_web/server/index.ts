@@ -4,6 +4,17 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import { spawn } from "child_process";
+import {
+  classifyTaskIntent,
+  renderTaskIntentForPrompt,
+  type TaskIntent,
+} from "../client/src/lib/taskIntent";
+import {
+  chooseBacktrackingAction,
+  DEFAULT_BACKTRACKING_POLICY,
+  parseVerifierScore,
+  renderBacktrackingPolicyForPrompt,
+} from "../client/src/lib/graphBacktracking";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,6 +28,22 @@ async function startServer() {
 
   let lastHeartbeat = Date.now();
   let hasReceivedFirstHeartbeat = false;
+  let activeRequests = 0;
+
+  app.use((req, res, next) => {
+    if (req.path !== "/api/heartbeat") {
+      activeRequests += 1;
+      let released = false;
+      const releaseRequest = () => {
+        if (released) return;
+        released = true;
+        activeRequests = Math.max(0, activeRequests - 1);
+      };
+      res.on("finish", releaseRequest);
+      res.on("close", releaseRequest);
+    }
+    next();
+  });
 
   app.post("/api/heartbeat", (_req, res) => {
     lastHeartbeat = Date.now();
@@ -25,6 +52,7 @@ async function startServer() {
   });
 
   const heartbeatInterval = setInterval(() => {
+    if (activeRequests > 0) return;
     if (hasReceivedFirstHeartbeat && Date.now() - lastHeartbeat > 7000) {
       console.log("[Heartbeat] No heartbeat detected for 7 seconds. Shutting down server...");
       clearInterval(heartbeatInterval);
@@ -138,6 +166,169 @@ async function startServer() {
       res.end();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown work_agent error.";
+      writeEvent({ type: "error", error: message });
+      res.end();
+    }
+  });
+
+  app.post("/api/work-agent/run-graph-stream", async (req, res) => {
+    const prompt = String(req.body?.prompt ?? "").trim();
+    const team = Array.isArray(req.body?.team) ? (req.body.team as AgentSlotPayload[]) : [];
+    const graph = normalizeAgentGraph(req.body?.graph);
+    if (!prompt) {
+      res.status(400).json({ ok: false, error: "Prompt is required." });
+      return;
+    }
+    if (!team.length) {
+      res.status(400).json({ ok: false, error: "Agent team is required." });
+      return;
+    }
+
+    res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    const writeEvent = (event: unknown) => {
+      res.write(`${JSON.stringify(event)}\n`);
+    };
+
+    const levels = buildAgentGraphLevels(team, graph.edges);
+    const taskIntent = classifyTaskIntent(prompt);
+    const outputs = new Map<string, string>();
+    const failed = new Set<string>();
+    const retryCounts: Record<string, number> = {};
+
+    writeEvent({ type: "graph-start", levels, taskIntent, backtrackingPolicy: DEFAULT_BACKTRACKING_POLICY });
+
+    try {
+      for (const level of levels) {
+        await Promise.all(
+          level.map(async (agentId) => {
+            const slot = team.find((agent) => agent.id === agentId);
+            if (!slot || !slot.isEnabled) return;
+
+            const upstream = graph.edges
+              .filter((edge) => edge.to === agentId)
+              .map((edge) => edge.from)
+              .filter((id) => team.find((agent) => agent.id === id)?.isEnabled);
+
+            if (upstream.some((id) => failed.has(id))) {
+              writeEvent({ type: "joint-skip", agentId, reason: "upstream-failed" });
+              failed.add(agentId);
+              return;
+            }
+
+            writeEvent({
+              type: "joint-start",
+              agentId,
+              name: slot.name,
+              role: slot.role,
+              model: slot.model,
+            });
+
+            try {
+              const result = await runWorkAgent(composeJointPrompt(prompt, slot, upstream, outputs, taskIntent), slot.model);
+              const typed = result as Record<string, unknown>;
+              const answer = String(typed.answer ?? JSON.stringify(result));
+              outputs.set(agentId, answer);
+              writeEvent({
+                type: "joint-complete",
+                agentId,
+                name: slot.name,
+                answer,
+                workbench: {
+                  status: typed.status ?? "done",
+                  plan: typed.plan ?? [],
+                  toolLogs: typed.toolLogs ?? [],
+                  safetyRules: typed.safetyRules ?? [],
+                  workspaceEntries: typed.workspaceEntries ?? [],
+                  allowedCommands: typed.allowedCommands ?? [],
+                },
+              });
+            } catch (error) {
+              const message = error instanceof Error ? error.message : "Unknown joint error.";
+              failed.add(agentId);
+              writeEvent({ type: "joint-error", agentId, name: slot.name, error: message });
+            }
+          })
+        );
+      }
+
+      const verifierId = findVerifierAgentId(team, outputs);
+      const verifierScore = verifierId ? parseVerifierScore(outputs.get(verifierId) ?? "") : null;
+      if (verifierScore) {
+        const action = chooseBacktrackingAction({
+          score: verifierScore.score,
+          retryTarget: verifierScore.retryTarget,
+          feedback: verifierScore.feedback,
+          round: 0,
+          previousBestScore: 0,
+          retryCounts,
+        });
+        writeEvent({ type: "backtracking-decision", verifierId, verifierScore, action });
+
+        if (action.type === "retry") {
+          const retrySlot = team.find((agent) => agent.id === action.targetAgentId && agent.isEnabled);
+          if (retrySlot) {
+            retryCounts[action.targetAgentId] = (retryCounts[action.targetAgentId] ?? 0) + 1;
+            const upstream = graph.edges
+              .filter((edge) => edge.to === action.targetAgentId)
+              .map((edge) => edge.from)
+              .filter((id) => team.find((agent) => agent.id === id)?.isEnabled);
+            writeEvent({
+              type: "backtracking-start",
+              targetAgentId: action.targetAgentId,
+              feedback: action.feedback,
+              round: action.nextRound,
+            });
+            writeEvent({
+              type: "joint-start",
+              agentId: retrySlot.id,
+              name: retrySlot.name,
+              role: retrySlot.role,
+              model: retrySlot.model,
+              reason: "backtracking",
+            });
+            try {
+              const retryPrompt = [
+                composeJointPrompt(prompt, retrySlot, upstream, outputs, taskIntent),
+                `Backtracking feedback:\n${action.feedback}`,
+                "Revise only this joint's output. Do not restart an open-ended debate.",
+              ].join("\n\n");
+              const result = await runWorkAgent(retryPrompt, retrySlot.model);
+              const typed = result as Record<string, unknown>;
+              const answer = String(typed.answer ?? JSON.stringify(result));
+              outputs.set(retrySlot.id, answer);
+              writeEvent({
+                type: "joint-complete",
+                agentId: retrySlot.id,
+                name: retrySlot.name,
+                answer,
+                reason: "backtracking",
+              });
+            } catch (error) {
+              const message = error instanceof Error ? error.message : "Unknown backtracking retry error.";
+              failed.add(retrySlot.id);
+              writeEvent({ type: "joint-error", agentId: retrySlot.id, name: retrySlot.name, error: message });
+            }
+          }
+        }
+      } else {
+        writeEvent({
+          type: "backtracking-decision",
+          action: { type: "stop", reason: "missing-verifier-score" },
+        });
+      }
+
+      const terminalIds = getTerminalAgentIds(team, graph.edges).filter((id) => outputs.has(id));
+      writeEvent({
+        type: "graph-complete",
+        terminalIds,
+        answer: terminalIds.map((id) => outputs.get(id)).join("\n\n"),
+      });
+      res.end();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown graph runner error.";
       writeEvent({ type: "error", error: message });
       res.end();
     }
@@ -314,6 +505,152 @@ function runWorkAgent(prompt: string, modelId: string): Promise<unknown> {
     child.stdin.write(JSON.stringify({ prompt, model }));
     child.stdin.end();
   });
+}
+
+interface AgentSlotPayload {
+  id: string;
+  name: string;
+  role: string;
+  model: string;
+  skill: string;
+  outputFormat: string;
+  isEnabled: boolean;
+}
+
+interface AgentGraphEdgePayload {
+  id: string;
+  from: string;
+  to: string;
+}
+
+interface AgentGraphPayload {
+  edges: AgentGraphEdgePayload[];
+}
+
+function normalizeAgentGraph(value: unknown): AgentGraphPayload {
+  const maybeGraph = value as { edges?: unknown };
+  const edges = Array.isArray(maybeGraph?.edges)
+    ? maybeGraph.edges
+        .map((edge) => edge as Partial<AgentGraphEdgePayload>)
+        .filter(
+          (edge): edge is AgentGraphEdgePayload =>
+            typeof edge.id === "string" &&
+            typeof edge.from === "string" &&
+            typeof edge.to === "string"
+        )
+    : [];
+  return { edges };
+}
+
+function buildAgentGraphLevels(team: AgentSlotPayload[], edges: AgentGraphEdgePayload[]): string[][] {
+  const enabledTeam = team.filter((slot) => slot.isEnabled);
+  const enabledIds = new Set(enabledTeam.map((slot) => slot.id));
+  if (!enabledIds.has("planner")) return [];
+
+  const reachable = findReachableIds("planner", edges, enabledIds);
+  const relevantIds = enabledTeam.map((slot) => slot.id).filter((id) => reachable.has(id));
+  const relevantEdges = edges.filter((edge) => reachable.has(edge.from) && reachable.has(edge.to));
+  const indegree = new Map(relevantIds.map((id) => [id, 0]));
+  const outgoing = new Map<string, string[]>();
+
+  for (const edge of relevantEdges) {
+    indegree.set(edge.to, (indegree.get(edge.to) ?? 0) + 1);
+    outgoing.set(edge.from, [...(outgoing.get(edge.from) ?? []), edge.to]);
+  }
+
+  const levels: string[][] = [];
+  const visited = new Set<string>();
+  let current = ["planner"].filter((id) => indegree.get(id) === 0);
+
+  while (current.length) {
+    const level = sortAgentIdsByTeam(current, enabledTeam).filter((id) => !visited.has(id));
+    if (!level.length) break;
+    levels.push(level);
+    level.forEach((id) => visited.add(id));
+
+    const next = new Set<string>();
+    for (const id of level) {
+      for (const target of outgoing.get(id) ?? []) {
+        const nextIndegree = (indegree.get(target) ?? 0) - 1;
+        indegree.set(target, nextIndegree);
+        if (nextIndegree === 0) next.add(target);
+      }
+    }
+    current = Array.from(next);
+  }
+
+  return levels;
+}
+
+function getTerminalAgentIds(team: AgentSlotPayload[], edges: AgentGraphEdgePayload[]): string[] {
+  const runnableIds = new Set(buildAgentGraphLevels(team, edges).flat());
+  const hasOutgoing = new Set(
+    edges.filter((edge) => runnableIds.has(edge.from) && runnableIds.has(edge.to)).map((edge) => edge.from)
+  );
+  return team.filter((slot) => slot.isEnabled && runnableIds.has(slot.id) && !hasOutgoing.has(slot.id)).map((slot) => slot.id);
+}
+
+function findReachableIds(rootId: string, edges: AgentGraphEdgePayload[], enabledIds: Set<string>) {
+  const reachable = new Set<string>();
+  const outgoing = new Map<string, string[]>();
+
+  for (const edge of edges) {
+    if (!enabledIds.has(edge.from) || !enabledIds.has(edge.to)) continue;
+    outgoing.set(edge.from, [...(outgoing.get(edge.from) ?? []), edge.to]);
+  }
+
+  const queue = [rootId];
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (reachable.has(id)) continue;
+    reachable.add(id);
+    queue.push(...(outgoing.get(id) ?? []));
+  }
+
+  return reachable;
+}
+
+function sortAgentIdsByTeam(ids: string[], team: AgentSlotPayload[]) {
+  const order = new Map(team.map((slot, index) => [slot.id, index]));
+  return [...ids].sort((left, right) => (order.get(left) ?? 0) - (order.get(right) ?? 0));
+}
+
+function composeJointPrompt(
+  originalTask: string,
+  slot: AgentSlotPayload,
+  upstreamIds: string[],
+  outputs: Map<string, string>,
+  taskIntent: TaskIntent
+) {
+  const upstreamContext = upstreamIds
+    .map((id) => `## Upstream joint: ${id}\n${outputs.get(id) ?? ""}`)
+    .join("\n\n");
+
+  return [
+    `You are the "${slot.name}" joint in an agent DAG.`,
+    `Role: ${slot.role}`,
+    `Skill prompt: ${slot.skill}`,
+    `Required output format: ${slot.outputFormat}`,
+    `Original user task:\n${originalTask}`,
+    renderTaskIntentForPrompt(taskIntent),
+    renderBacktrackingPolicyForPrompt(DEFAULT_BACKTRACKING_POLICY),
+    slot.id === "verifier" || /verifier|驗證/i.test(`${slot.id} ${slot.name} ${slot.role}`)
+      ? [
+          "Verifier scoring requirement:",
+          "Return a concise answer plus a JSON block containing score, passed, failedReason, retryTarget, feedback.",
+          "Score must be 0 to 1. If required evidence is missing, passed must be false.",
+        ].join("\n")
+      : "",
+    upstreamContext ? `Upstream context:\n${upstreamContext}` : "Upstream context: none. You are receiving the original task directly.",
+  ].join("\n\n");
+}
+
+function findVerifierAgentId(team: AgentSlotPayload[], outputs: Map<string, string>) {
+  return team.find(
+    (slot) =>
+      outputs.has(slot.id) &&
+      (slot.id === "verifier" || /verifier|驗證/i.test(`${slot.name} ${slot.role}`))
+  )?.id;
 }
 
 function runWorkAgentPatch(prompt: string, filePath: string, modelId: string): Promise<unknown> {

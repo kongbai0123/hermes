@@ -4,7 +4,6 @@ import TopBar from './TopBar';
 import ChatSidebar from './ChatSidebar';
 import ChatWindow from './ChatWindow';
 import RightPanel from './RightPanel';
-import AgentFlowPanel from './AgentFlowPanel';
 
 /**
  * AppShell: Main layout container
@@ -30,15 +29,16 @@ export default function AppShell() {
         onToggleAgentFlow={() => setAgentFlowOpen((current) => !current)}
       />
 
-      <AgentFlowPanel isOpen={agentFlowOpen} onClose={() => setAgentFlowOpen(false)} />
-
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar - Chat History */}
         <ChatSidebar />
 
         {/* Center - Chat Window */}
-        <ChatWindow />
+        <ChatWindow
+          agentFlowOpen={agentFlowOpen}
+          onToggleAgentFlow={() => setAgentFlowOpen((current) => !current)}
+        />
 
         {/* Right Panel - Optional Context/Settings */}
         {state.rightPanelOpen && <RightPanel />}

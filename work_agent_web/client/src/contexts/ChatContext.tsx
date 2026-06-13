@@ -1,5 +1,21 @@
 import { createContext, useContext, useEffect, useReducer, useRef, ReactNode } from "react";
-import { AppState, ChatAction, Chat, TaskMode } from "@/types/chat";
+import { AgentGraph, AppState, ChatAction, Chat, TaskMode } from "@/types/chat";
+import {
+  addAgentGraphEdge,
+  createDefaultAgentGraph,
+  removeAgentFromGraph,
+  removeAgentGraphEdge,
+  updateAgentGraphPosition,
+} from "@/lib/agentGraph";
+import {
+  buildRecommendedAgentFlow,
+  getAgentFlowRecommendation,
+} from "@/lib/agentFlowRecommendations";
+import {
+  applyAgentRunEvent,
+  createQueuedAgentRuns,
+  createRunLogEntry,
+} from "@/lib/agentRuns";
 import { DEFAULT_AGENT_TEAM, WORK_AGENT_MODELS } from "@/lib/workAgent";
 import {
   fetchServerChatState,
@@ -40,6 +56,10 @@ function cloneDefaultAgentTeam() {
   return DEFAULT_AGENT_TEAM.map((slot) => ({ ...slot, permissions: [...slot.permissions] }));
 }
 
+function ensureAgentGraph(chat: Pick<Chat, "agentTeam" | "agentGraph">): AgentGraph {
+  return chat.agentGraph ?? createDefaultAgentGraph(chat.agentTeam?.length ? chat.agentTeam : cloneDefaultAgentTeam());
+}
+
 function reviveDate(value: unknown): Date {
   if (value instanceof Date) return value;
   const date = new Date(String(value || Date.now()));
@@ -55,28 +75,38 @@ export function restoreChatState(serialized: string | null): AppState {
       ...initialState,
       ...parsed,
       models: WORK_AGENT_MODELS,
-      chats: (parsed.chats || []).map((chat) => ({
-        ...chat,
-        taskMode: chat.taskMode ?? "single",
-        agentTeam: chat.agentTeam?.length
+      chats: (parsed.chats || []).map((chat) => {
+        const agentTeam = chat.agentTeam?.length
           ? chat.agentTeam.map((slot) => ({
               ...slot,
               permissions: [...(slot.permissions || [])],
               isEnabled: slot.isEnabled ?? true,
             }))
-          : cloneDefaultAgentTeam(),
-        createdAt: reviveDate(chat.createdAt),
-        updatedAt: reviveDate(chat.updatedAt),
-        settings: {
-          ...chat.settings,
-          reasoningLevel: chat.settings?.reasoningLevel ?? "medium",
-          responseSpeed: chat.settings?.responseSpeed ?? "standard",
-        },
-        messages: (chat.messages || []).map((message) => ({
-          ...message,
-          createdAt: reviveDate(message.createdAt),
-        })),
-      })) as Chat[],
+          : cloneDefaultAgentTeam();
+
+        return {
+          ...chat,
+          taskMode: chat.taskMode ?? "single",
+          agentTeam,
+          agentGraph: chat.agentGraph ?? createDefaultAgentGraph(agentTeam),
+          createdAt: reviveDate(chat.createdAt),
+          updatedAt: reviveDate(chat.updatedAt),
+          settings: {
+            ...chat.settings,
+            reasoningLevel: chat.settings?.reasoningLevel ?? "medium",
+            responseSpeed: chat.settings?.responseSpeed ?? "standard",
+          },
+          messages: (chat.messages || []).map((message) => ({
+            ...message,
+            createdAt: reviveDate(message.createdAt),
+          })),
+          workbench: {
+            ...chat.workbench,
+            agentRuns: chat.workbench?.agentRuns ?? {},
+            agentRunLog: chat.workbench?.agentRunLog ?? [],
+          },
+        };
+      }) as Chat[],
       projects: parsed.projects?.length ? parsed.projects : initialState.projects,
     };
   } catch {
@@ -297,23 +327,31 @@ export function chatReducer(state: AppState, action: ChatAction): AppState {
 
           const currentTeam = chat.agentTeam?.length ? chat.agentTeam : cloneDefaultAgentTeam();
           const nextNumber = currentTeam.length + 1;
+          const newSlot = action.payload.slot ?? {
+            id: `agent-${Date.now()}`,
+            name: `Agent ${nextNumber}`,
+            role: "自訂角色",
+            model: chat.settings.model,
+            skill: "描述這個 Agent 的任務、責任範圍、禁止事項與完成條件。",
+            permissions: ["plan"],
+            outputFormat: "summary",
+            isEnabled: true,
+          };
+          const nextTeam = [...currentTeam, newSlot];
+          const graph = ensureAgentGraph({ agentTeam: currentTeam, agentGraph: chat.agentGraph });
+          const defaultGraph = createDefaultAgentGraph(nextTeam);
 
           return {
             ...chat,
             updatedAt: new Date(),
-            agentTeam: [
-              ...currentTeam,
-              {
-                id: `agent-${Date.now()}`,
-                name: `Agent ${nextNumber}`,
-                role: "自訂角色",
-                model: chat.settings.model,
-                skill: "描述這個 Agent 的任務、責任範圍、禁止事項與完成條件。",
-                permissions: ["plan"],
-                outputFormat: "summary",
-                isEnabled: true,
+            agentTeam: nextTeam,
+            agentGraph: {
+              ...graph,
+              positions: {
+                ...graph.positions,
+                [newSlot.id]: defaultGraph.positions[newSlot.id],
               },
-            ],
+            },
           };
         }),
       };
@@ -347,14 +385,141 @@ export function chatReducer(state: AppState, action: ChatAction): AppState {
       return {
         ...state,
         chats: state.chats.map((chat) =>
-          chat.id === action.payload.chatId
+          chat.id === action.payload.chatId && action.payload.slotId !== "planner"
             ? {
                 ...chat,
                 updatedAt: new Date(),
                 agentTeam: (chat.agentTeam || []).filter((slot) => slot.id !== action.payload.slotId),
+                agentGraph: removeAgentFromGraph(
+                  ensureAgentGraph(chat),
+                  action.payload.slotId
+                ),
               }
             : chat
         ),
+      };
+    }
+
+    case "ADD_AGENT_GRAPH_EDGE": {
+      return {
+        ...state,
+        chats: state.chats.map((chat) => {
+          if (chat.id !== action.payload.chatId) return chat;
+          const result = addAgentGraphEdge(ensureAgentGraph(chat), chat.agentTeam, {
+            from: action.payload.from,
+            to: action.payload.to,
+          });
+          if (!result.ok) return chat;
+
+          return {
+            ...chat,
+            updatedAt: new Date(),
+            agentGraph: result.graph,
+          };
+        }),
+      };
+    }
+
+    case "DELETE_AGENT_GRAPH_EDGE": {
+      return {
+        ...state,
+        chats: state.chats.map((chat) =>
+          chat.id === action.payload.chatId
+            ? {
+                ...chat,
+                updatedAt: new Date(),
+                agentGraph: removeAgentGraphEdge(ensureAgentGraph(chat), action.payload.edgeId),
+              }
+            : chat
+        ),
+      };
+    }
+
+    case "UPDATE_AGENT_GRAPH_POSITION": {
+      return {
+        ...state,
+        chats: state.chats.map((chat) =>
+          chat.id === action.payload.chatId
+            ? {
+                ...chat,
+                updatedAt: new Date(),
+                agentGraph: updateAgentGraphPosition(
+                  ensureAgentGraph(chat),
+                  action.payload.agentId,
+                  action.payload.position
+                ),
+              }
+            : chat
+        ),
+      };
+    }
+
+    case "APPLY_AGENT_FLOW_RECOMMENDATION": {
+      return {
+        ...state,
+        chats: state.chats.map((chat) => {
+          if (chat.id !== action.payload.chatId) return chat;
+          if (!getAgentFlowRecommendation(action.payload.recommendationId)) return chat;
+          const flow = buildRecommendedAgentFlow(
+            action.payload.recommendationId,
+            chat.settings.model
+          );
+
+          return {
+            ...chat,
+            updatedAt: new Date(),
+            taskMode: "orchestration",
+            agentTeam: flow.agentTeam,
+            agentGraph: flow.agentGraph,
+            workbench: {
+              ...chat.workbench,
+              agentRuns: {},
+              agentRunLog: [],
+            },
+          };
+        }),
+      };
+    }
+
+    case "INITIALIZE_AGENT_RUNS": {
+      return {
+        ...state,
+        chats: state.chats.map((chat) =>
+          chat.id === action.payload.chatId
+            ? {
+                ...chat,
+                updatedAt: new Date(),
+                workbench: {
+                  ...chat.workbench,
+                  agentRuns: createQueuedAgentRuns(chat.agentTeam, action.payload.at),
+                  agentRunLog: [],
+                },
+              }
+            : chat
+        ),
+      };
+    }
+
+    case "UPDATE_AGENT_RUN_EVENT": {
+      return {
+        ...state,
+        chats: state.chats.map((chat) => {
+          if (chat.id !== action.payload.chatId) return chat;
+          const event = action.payload.event;
+
+          return {
+            ...chat,
+            updatedAt: new Date(),
+            workbench: {
+              ...chat.workbench,
+              agentRuns: applyAgentRunEvent(chat.workbench.agentRuns ?? {}, event),
+              agentRunLog: [
+                ...(chat.workbench.agentRunLog ?? []),
+                createRunLogEntry(event),
+              ].slice(-30),
+            },
+          };
+        }),
       };
     }
 
